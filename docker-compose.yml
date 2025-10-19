@@ -9,28 +9,13 @@ services:
       - "3000:3000"
     container_name: "app"
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - DATABASE_URL=mysql://root:password@db:3306/merry_share
-    depends_on:
-      - db
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      - DIRECT_URL=postgresql://postgres:postgres@host.docker.internal:54322/postgres
     volumes:
       - .:/app
       - /app/.next
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     tty: true
     stdin_open: true
-
-  db:
-    image: mysql:8.0
-    restart: always
-    container_name: "db"
-    environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: merry_share
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./mysql/init:/docker-entrypoint-initdb.d
-
-volumes:
-  mysql_data:

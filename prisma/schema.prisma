@@ -1,49 +1,70 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-1.1.x"]
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Wedding {
+  wedding_id   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wedding_date DateTime  @db.Date
+  qr_code_path String?   @db.VarChar(500)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+  deleted_at   DateTime? @db.Timestamptz(6)
+  created_by   String?   @db.Uuid
+  updated_by   String?   @db.Uuid
+  deleted_by   String?   @db.Uuid
+  medias       Media[]
+  users        User[]
+
+  @@index([wedding_date], map: "idx_weddings_wedding_date")
+  @@index([deleted_at], map: "idx_weddings_deleted_at")
+  @@map("weddings")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user_id    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wedding_id String    @db.Uuid
+  user_name  String    @db.VarChar(100)
+  email      String    @unique @db.VarChar(255)
+  password   String    @db.VarChar(255)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime  @default(now()) @db.Timestamptz(6)
+  deleted_at DateTime? @db.Timestamptz(6)
+  created_by String?   @db.Uuid
+  updated_by String?   @db.Uuid
+  deleted_by String?   @db.Uuid
+  wedding    Wedding   @relation(fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
 
-  files File[]
-
+  @@index([wedding_id], map: "idx_users_wedding_id")
+  @@index([email], map: "idx_users_email")
+  @@index([deleted_at], map: "idx_users_deleted_at")
   @@map("users")
 }
 
-model File {
-  id          String   @id @default(cuid())
-  filename    String
-  originalName String
-  mimeType    String
-  size        Int
-  url         String
-  userId      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("files")
-}
-
 model Media {
-  id            String   @id @default(cuid())
-  url           String
-  thumbnail_url String?
-  title         String?
-  description   String?
-  uploaded_by   String?
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  media_id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wedding_id        String    @db.Uuid
+  posted_user_name  String    @db.VarChar(150)
+  media_path        String    @db.VarChar(500)
+  media_type        String    @default("image") @db.VarChar(20) // "image" or "video"
+  posted_at         DateTime  @default(now()) @db.Timestamptz(6)
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  created_by        String?   @db.Uuid
+  updated_by        String?   @db.Uuid
+  deleted_by        String?   @db.Uuid
+  wedding           Wedding   @relation(fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
 
-  @@map("media")
+  @@index([wedding_id], map: "idx_medias_wedding_id")
+  @@index([posted_user_name], map: "idx_medias_posted_user_name")
+  @@index([posted_at], map: "idx_medias_posted_at")
+  @@index([deleted_at], map: "idx_medias_deleted_at")
+  @@map("medias")
 }
