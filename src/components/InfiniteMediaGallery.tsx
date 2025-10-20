@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Heart, Download, Calendar, Play } from "lucide-react";
+import { Download, Play, Heart, CheckSquare, Square, X } from "lucide-react";
 import Image from "next/image";
 import type { Media as PrismaMedia } from "@prisma/client";
 
@@ -20,6 +20,9 @@ export function InfiniteMediaGallery({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set());
+  const [isDownloading, setIsDownloading] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -45,6 +48,87 @@ export function InfiniteMediaGallery({
       setLoading(false);
     }
   }, [loading, hasMore, page]);
+
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    if (selectionMode) {
+      setSelectedMediaIds(new Set());
+    }
+  };
+
+  const toggleMediaSelection = (mediaId: string) => {
+    setSelectedMediaIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(mediaId)) {
+        newSet.delete(mediaId);
+      } else {
+        newSet.add(mediaId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    const allMediaIds = medias.map((m) => m.media_id);
+    setSelectedMediaIds(new Set(allMediaIds));
+  };
+
+  const deselectAll = () => {
+    setSelectedMediaIds(new Set());
+  };
+
+  const handleBulkDownload = async () => {
+    if (selectedMediaIds.size === 0) {
+      alert('ダウンロードする画像を選択してください');
+      return;
+    }
+
+    setIsDownloading(true);
+    const selectedMedias = medias.filter((m) => selectedMediaIds.has(m.media_id));
+
+    try {
+      for (let i = 0; i < selectedMedias.length; i++) {
+        const media = selectedMedias[i];
+        const isVideo = media.media_type === 'video';
+        const extension = isVideo ? 'mp4' : 'jpg';
+        const fileName = `merry-share-${media.media_id}.${extension}`;
+
+        const response = await fetch(
+          `/api/media/download?url=${encodeURIComponent(media.media_path)}&filename=${encodeURIComponent(fileName)}`
+        );
+
+        if (!response.ok) {
+          console.error(`Failed to download ${fileName}`);
+          continue;
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        // ダウンロード間に少し待機（ブラウザの制限を回避）
+        if (i < selectedMedias.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+
+      alert(`${selectedMedias.length}件のダウンロードが完了しました`);
+      setSelectionMode(false);
+      setSelectedMediaIds(new Set());
+    } catch (error) {
+      console.error('一括ダウンロードに失敗しました:', error);
+      alert('一括ダウンロードに失敗しました');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   useEffect(() => {
     if (!loadMoreRef.current) return;
@@ -78,10 +162,16 @@ export function InfiniteMediaGallery({
   }
 
   return (
-    <div>
+    <div className="relative">
       <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 gap-4 p-4 max-w-7xl mx-auto">
         {medias.map((item) => (
-          <MediaCard key={item.media_id} media={item} />
+          <MediaCard
+            key={item.media_id}
+            media={item}
+            selectionMode={selectionMode}
+            isSelected={selectedMediaIds.has(item.media_id)}
+            onToggleSelection={toggleMediaSelection}
+          />
         ))}
       </div>
 
@@ -97,13 +187,112 @@ export function InfiniteMediaGallery({
           すべての写真を表示しました
         </div>
       )}
+
+      {/* 選択モードボタン（通常時） */}
+      {!selectionMode && (
+        <button
+          onClick={toggleSelectionMode}
+          className="fixed bottom-6 left-6 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-medium hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl z-40 flex items-center gap-2"
+        >
+          <Download className="w-5 h-5" />
+          <span className="hidden sm:inline">ダウンロード</span>
+        </button>
+      )}
+
+      {/* 選択モードツールバー */}
+      {selectionMode && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-t-2 border-purple-200 px-3 py-4 shadow-2xl">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium text-gray-700">
+                {selectedMediaIds.size === 0 ? (
+                  <span className="text-purple-600">ダウンロードする画像を選択</span>
+                ) : (
+                  <span className="text-purple-600">{selectedMediaIds.size}件選択中</span>
+                )}
+              </p>
+              <button
+                onClick={selectedMediaIds.size === medias.length ? deselectAll : selectAll}
+                className="text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors whitespace-nowrap"
+              >
+                {selectedMediaIds.size === medias.length ? '全解除' : '全選択'}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleSelectionMode}
+                className="px-3 py-3 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200 whitespace-nowrap"
+              >
+                <span className="flex items-center justify-center gap-1.5">
+                  <X className="w-5 h-5" />
+                  <span className="text-sm">キャンセル</span>
+                </span>
+              </button>
+              <button
+                onClick={handleBulkDownload}
+                disabled={isDownloading || selectedMediaIds.size === 0}
+                className="flex-1 px-3 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg disabled:shadow-none flex items-center justify-center gap-1.5 whitespace-nowrap"
+              >
+                <Download className="w-5 h-5" />
+                <span className="text-sm">
+                  {isDownloading ? 'ダウンロード中...' : `${selectedMediaIds.size > 0 ? `${selectedMediaIds.size}件` : ''}ダウンロード`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 選択モード時のスペース確保 */}
+      {selectionMode && <div className="h-20" />}
     </div>
   );
 }
 
-function MediaCard({ media }: { media: Media }) {
+interface MediaCardProps {
+  media: Media;
+  selectionMode: boolean;
+  isSelected: boolean;
+  onToggleSelection: (mediaId: string) => void;
+}
+
+function MediaCard({ media, selectionMode, isSelected, onToggleSelection }: MediaCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isVideo = media.media_type === 'video';
+
+  const handleDownload = async () => {
+    try {
+      // APIルート経由でダウンロード
+      const extension = isVideo ? 'mp4' : 'jpg';
+      const fileName = `merry-share-${media.media_id}.${extension}`;
+
+      const response = await fetch(`/api/media/download?url=${encodeURIComponent(media.media_path)}&filename=${encodeURIComponent(fileName)}`);
+
+      if (!response.ok) {
+        throw new Error('ダウンロードに失敗しました');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('ダウンロードに失敗しました:', error);
+      alert('ダウンロードに失敗しました');
+    }
+  };
+
+  const handleCardClick = () => {
+    if (selectionMode) {
+      onToggleSelection(media.media_id);
+    }
+  };
 
   return (
     <div
@@ -111,13 +300,18 @@ function MediaCard({ media }: { media: Media }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-300">
+      <div
+        className={`relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 ${
+          selectionMode ? 'cursor-pointer' : ''
+        } ${isSelected ? 'ring-4 ring-purple-500 ring-offset-2' : ''}`}
+        onClick={handleCardClick}
+      >
         {isVideo ? (
           <div className="relative">
             <video
               src={media.media_path}
               className="w-full h-auto object-cover"
-              controls
+              controls={!selectionMode}
               preload="metadata"
             />
             <div className="absolute top-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
@@ -137,23 +331,45 @@ function MediaCard({ media }: { media: Media }) {
           />
         )}
 
-        {isHovered && (
+        {/* 選択モード時のチェックボックス */}
+        {selectionMode && (
+          <div className="absolute top-3 left-3 z-10">
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                isSelected
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white scale-110'
+                  : 'bg-white/90 text-gray-600 hover:bg-white'
+              }`}
+            >
+              {isSelected ? (
+                <CheckSquare className="w-5 h-5" />
+              ) : (
+                <Square className="w-5 h-5" />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 選択された時のオーバーレイ */}
+        {isSelected && (
+          <div className="absolute inset-0 bg-purple-500/20 pointer-events-none" />
+        )}
+
+        {/* ホバー時のダウンロードボタン（選択モードではない時のみ） */}
+        {!selectionMode && isHovered && (
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-xs text-white/80">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>{new Date(media.posted_at).toLocaleDateString("ja-JP")}</span>
-                  </div>
                   <p className="text-sm font-medium">{media.posted_user_name}</p>
                 </div>
 
                 <div className="flex gap-2">
-                  <button className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors">
-                    <Heart className="w-4 h-4" />
-                  </button>
-                  <button className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors">
+                  <button
+                    onClick={handleDownload}
+                    className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors"
+                    aria-label="ダウンロード"
+                  >
                     <Download className="w-4 h-4" />
                   </button>
                 </div>
