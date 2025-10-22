@@ -5,14 +5,62 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, userName, weddingDate } = body
+    const { email, password, userName, weddingDate, invitationToken } = body
 
-    // バリデーション
-    if (!email || !password || !userName || !weddingDate) {
-      return NextResponse.json(
-        { error: 'メールアドレス、パスワード、ユーザー名、結婚式の日付は必須です' },
-        { status: 400 }
-      )
+    // 招待トークンの有無で処理を分岐
+    let invitationData = null
+
+    if (invitationToken) {
+      // 招待経由の場合：招待トークンを検証
+      const invitation = await prisma.invitation.findUnique({
+        where: { token: invitationToken }
+      })
+
+      if (!invitation) {
+        return NextResponse.json(
+          { error: '無効な招待URLです' },
+          { status: 400 }
+        )
+      }
+
+      if (invitation.used_at) {
+        return NextResponse.json(
+          { error: 'この招待URLは既に使用されています' },
+          { status: 400 }
+        )
+      }
+
+      if (new Date() > invitation.expires_at) {
+        return NextResponse.json(
+          { error: '招待URLの有効期限が切れています' },
+          { status: 400 }
+        )
+      }
+
+      if (invitation.email !== email) {
+        return NextResponse.json(
+          { error: '招待されたメールアドレスと異なります' },
+          { status: 400 }
+        )
+      }
+
+      invitationData = invitation
+
+      // 招待経由の場合：結婚式の日付は不要（招待者のwedding_idを使用）
+      if (!email || !password || !userName) {
+        return NextResponse.json(
+          { error: 'メールアドレス、パスワード、ユーザー名は必須です' },
+          { status: 400 }
+        )
+      }
+    } else {
+      // 通常の会員登録：結婚式の日付が必要
+      if (!email || !password || !userName || !weddingDate) {
+        return NextResponse.json(
+          { error: 'メールアドレス、パスワード、ユーザー名、結婚式の日付は必須です' },
+          { status: 400 }
+        )
+      }
     }
 
     if (password.length < 6) {
@@ -52,22 +100,48 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Weddingレコードを作成
+    // Weddingレコードを作成または既存のものを使用
     let wedding
-    try {
-      wedding = await prisma.wedding.create({
-        data: {
-          wedding_date: new Date(weddingDate),
-          created_by: authData.user.id,
-          updated_by: authData.user.id,
-        },
-      })
-    } catch (prismaError) {
-      console.error('Wedding Creation Error:', prismaError)
-      return NextResponse.json(
-        { error: 'ウェディング情報の作成に失敗しました' },
-        { status: 500 }
-      )
+
+    if (invitationData) {
+      // 招待経由の場合：既存のweddingを取得
+      try {
+        const existingWedding = await prisma.wedding.findUnique({
+          where: { wedding_id: invitationData.wedding_id }
+        })
+
+        if (!existingWedding) {
+          return NextResponse.json(
+            { error: 'ウェディング情報が見つかりません' },
+            { status: 404 }
+          )
+        }
+
+        wedding = existingWedding
+      } catch (prismaError) {
+        console.error('Wedding Fetch Error:', prismaError)
+        return NextResponse.json(
+          { error: 'ウェディング情報の取得に失敗しました' },
+          { status: 500 }
+        )
+      }
+    } else {
+      // 通常の会員登録：新しいweddingを作成
+      try {
+        wedding = await prisma.wedding.create({
+          data: {
+            wedding_date: new Date(weddingDate),
+            created_by: authData.user.id,
+            updated_by: authData.user.id,
+          },
+        })
+      } catch (prismaError) {
+        console.error('Wedding Creation Error:', prismaError)
+        return NextResponse.json(
+          { error: 'ウェディング情報の作成に失敗しました' },
+          { status: 500 }
+        )
+      }
     }
 
     // Userレコードを作成（Weddingと紐付け）
@@ -89,6 +163,19 @@ export async function POST(request: NextRequest) {
         { error: 'ユーザー情報の作成に失敗しました' },
         { status: 500 }
       )
+    }
+
+    // 招待トークンを使用済みにマーク
+    if (invitationData) {
+      try {
+        await prisma.invitation.update({
+          where: { invitation_id: invitationData.invitation_id },
+          data: { used_at: new Date() }
+        })
+      } catch (prismaError) {
+        console.error('Invitation Update Error:', prismaError)
+        // エラーログは出すが、会員登録自体は成功とする
+      }
     }
 
     return NextResponse.json(

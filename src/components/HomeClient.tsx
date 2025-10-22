@@ -1,16 +1,18 @@
 'use client'
 
-import { Heart, LogOut } from "lucide-react"
+import { Heart, LogOut, UserPlus } from "lucide-react"
 import { FloatingUploadButton } from "@/components/FloatingUploadButton"
 import { QRCodeGenerator } from "@/components/QRCodeGenerator"
 import { useAuth } from "@/contexts/AuthContext"
 import { ReactNode } from "react"
+import Link from "next/link"
 
 interface HomeClientProps {
   children: ReactNode
+  showUploadButton?: boolean
 }
 
-export default function HomeClient({ children }: HomeClientProps) {
+export default function HomeClient({ children, showUploadButton = true }: HomeClientProps) {
   const { user, logout } = useAuth()
 
   return (
@@ -18,7 +20,7 @@ export default function HomeClient({ children }: HomeClientProps) {
       <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-10 border-b border-rose-100">
         <div className="max-w-7xl mx-auto px-4 py-2.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 sm:gap-3">
+            <Link href="/" className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity">
               <div className="bg-gradient-to-br from-rose-400 to-pink-400 p-1.5 sm:p-2 rounded-lg sm:rounded-xl shadow-sm">
                 <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="white" />
               </div>
@@ -28,7 +30,7 @@ export default function HomeClient({ children }: HomeClientProps) {
                 </h1>
                 <p className="text-xs text-gray-500 hidden sm:block">大切な思い出を共有しよう</p>
               </div>
-            </div>
+            </Link>
             <div className="flex items-center gap-2">
               {user && (
                 <span className="text-sm text-gray-600 hidden sm:inline">
@@ -36,6 +38,13 @@ export default function HomeClient({ children }: HomeClientProps) {
                 </span>
               )}
               <QRCodeGenerator />
+              <Link
+                href="/invite"
+                className="p-2 rounded-lg hover:bg-rose-50 transition-colors"
+                title="管理者を招待"
+              >
+                <UserPlus className="w-5 h-5 text-gray-600" />
+              </Link>
               <button
                 onClick={logout}
                 className="p-2 rounded-lg hover:bg-rose-50 transition-colors"
@@ -52,7 +61,7 @@ export default function HomeClient({ children }: HomeClientProps) {
         {children}
       </main>
 
-      <FloatingUploadButton />
+      {showUploadButton && <FloatingUploadButton />}
     </div>
   )
 }
