@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Download, Play, Heart, CheckSquare, Square, X } from "lucide-react";
+import { Download, Play, Heart, CheckSquare, Square, X, ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import type { Media as PrismaMedia } from "@prisma/client";
 
@@ -23,6 +23,10 @@ export function InfiniteMediaGallery({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
+  const [lightboxMedia, setLightboxMedia] = useState<Media | null>(null);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState<number>(0);
+  const [touchStart, setTouchStart] = useState<number>(0);
+  const [touchEnd, setTouchEnd] = useState<number>(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -130,6 +134,57 @@ export function InfiniteMediaGallery({
     }
   };
 
+  const openLightbox = (media: Media) => {
+    const index = medias.findIndex((m) => m.media_id === media.media_id);
+    setCurrentMediaIndex(index);
+    setLightboxMedia(media);
+  };
+
+  const closeLightbox = () => {
+    setLightboxMedia(null);
+  };
+
+  const goToNextMedia = () => {
+    if (currentMediaIndex < medias.length - 1) {
+      const nextIndex = currentMediaIndex + 1;
+      setCurrentMediaIndex(nextIndex);
+      setLightboxMedia(medias[nextIndex]);
+    }
+  };
+
+  const goToPreviousMedia = () => {
+    if (currentMediaIndex > 0) {
+      const prevIndex = currentMediaIndex - 1;
+      setCurrentMediaIndex(prevIndex);
+      setLightboxMedia(medias[prevIndex]);
+    }
+  };
+
+  // タッチイベントハンドラー
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const minSwipeDistance = 50; // 最小スワイプ距離
+
+    if (distance > minSwipeDistance) {
+      // 左にスワイプ → 次の画像
+      goToNextMedia();
+    } else if (distance < -minSwipeDistance) {
+      // 右にスワイプ → 前の画像
+      goToPreviousMedia();
+    }
+  };
+
   useEffect(() => {
     if (!loadMoreRef.current) return;
 
@@ -151,6 +206,24 @@ export function InfiniteMediaGallery({
     };
   }, [loadMore, hasMore, loading]);
 
+  // キーボード操作
+  useEffect(() => {
+    if (!lightboxMedia) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeLightbox();
+      } else if (e.key === 'ArrowLeft') {
+        goToPreviousMedia();
+      } else if (e.key === 'ArrowRight') {
+        goToNextMedia();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxMedia, currentMediaIndex, medias.length]);
+
   if (medias.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center px-4 min-h-[calc(100vh-200px)]">
@@ -171,6 +244,7 @@ export function InfiniteMediaGallery({
             selectionMode={selectionMode}
             isSelected={selectedMediaIds.has(item.media_id)}
             onToggleSelection={toggleMediaSelection}
+            onMediaClick={openLightbox}
           />
         ))}
       </div>
@@ -245,6 +319,127 @@ export function InfiniteMediaGallery({
 
       {/* 選択モード時のスペース確保 */}
       {selectionMode && <div className="h-20" />}
+
+      {/* ライトボックスモーダル */}
+      {lightboxMedia && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={closeLightbox}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* 閉じるボタン */}
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 p-2 text-white hover:bg-white/10 rounded-full transition-colors z-50"
+            aria-label="閉じる"
+          >
+            <X className="w-8 h-8" />
+          </button>
+
+          {/* 前の画像ボタン */}
+          {currentMediaIndex > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                goToPreviousMedia();
+              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white hover:bg-white/10 rounded-full transition-colors z-50"
+              aria-label="前の画像"
+            >
+              <ChevronLeft className="w-10 h-10" />
+            </button>
+          )}
+
+          {/* 次の画像ボタン */}
+          {currentMediaIndex < medias.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                goToNextMedia();
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white hover:bg-white/10 rounded-full transition-colors z-50"
+              aria-label="次の画像"
+            >
+              <ChevronRight className="w-10 h-10" />
+            </button>
+          )}
+
+          {/* メディアコンテンツ */}
+          <div
+            className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {lightboxMedia.media_type === 'video' ? (
+              <video
+                src={lightboxMedia.media_path}
+                className="max-w-full max-h-[90vh] object-contain"
+                controls
+                autoPlay
+              />
+            ) : (
+              <Image
+                src={lightboxMedia.media_path}
+                alt={`メディア ${lightboxMedia.media_id}`}
+                width={0}
+                height={0}
+                sizes="90vw"
+                className="max-w-full max-h-[90vh] w-auto h-auto object-contain"
+                priority
+              />
+            )}
+          </div>
+
+          {/* 画像情報 */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 text-white">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div>
+                <p className="text-lg font-medium">{lightboxMedia.posted_user_name}</p>
+                <p className="text-sm text-gray-300">
+                  {currentMediaIndex + 1} / {medias.length}
+                </p>
+              </div>
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const isVideo = lightboxMedia.media_type === 'video';
+                  const extension = isVideo ? 'mp4' : 'jpg';
+                  const fileName = `merry-share-${lightboxMedia.media_id}.${extension}`;
+
+                  try {
+                    const response = await fetch(
+                      `/api/media/download?url=${encodeURIComponent(lightboxMedia.media_path)}&filename=${encodeURIComponent(fileName)}`
+                    );
+
+                    if (!response.ok) {
+                      throw new Error('ダウンロードに失敗しました');
+                    }
+
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                  } catch (error) {
+                    console.error('ダウンロードに失敗しました:', error);
+                    alert('ダウンロードに失敗しました');
+                  }
+                }}
+                className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-colors flex items-center gap-2"
+              >
+                <Download className="w-5 h-5" />
+                <span>ダウンロード</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -254,9 +449,10 @@ interface MediaCardProps {
   selectionMode: boolean;
   isSelected: boolean;
   onToggleSelection: (mediaId: string) => void;
+  onMediaClick: (media: Media) => void;
 }
 
-function MediaCard({ media, selectionMode, isSelected, onToggleSelection }: MediaCardProps) {
+function MediaCard({ media, selectionMode, isSelected, onToggleSelection, onMediaClick }: MediaCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isVideo = media.media_type === 'video';
 
@@ -291,6 +487,8 @@ function MediaCard({ media, selectionMode, isSelected, onToggleSelection }: Medi
   const handleCardClick = () => {
     if (selectionMode) {
       onToggleSelection(media.media_id);
+    } else {
+      onMediaClick(media);
     }
   };
 
