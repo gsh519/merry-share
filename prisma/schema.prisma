@@ -21,8 +21,7 @@ model Wedding {
   deleted_by   String?        @db.Uuid
   medias       Media[]
   users        User[]
-  subscription Subscription?
-  payments     Payment[]
+  invitations  Invitation[]   @relation("InvitationToWedding")
 
   @@index([wedding_date], map: "idx_weddings_wedding_date")
   @@index([deleted_at], map: "idx_weddings_deleted_at")
@@ -30,8 +29,8 @@ model Wedding {
 }
 
 model User {
-  user_id    String    @id @db.Uuid
-  wedding_id String?   @db.Uuid
+  user_id    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wedding_id String    @db.Uuid
   user_name  String    @db.VarChar(100)
   email      String    @unique @db.VarChar(255)
   password   String    @default("") @db.VarChar(255)
@@ -41,7 +40,7 @@ model User {
   created_by String?   @db.Uuid
   updated_by String?   @db.Uuid
   deleted_by String?   @db.Uuid
-  wedding    Wedding?  @relation(fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
+  wedding    Wedding   @relation(fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
 
   @@index([wedding_id], map: "idx_users_wedding_id")
   @@index([email], map: "idx_users_email")
@@ -88,6 +87,7 @@ model Invitation {
   created_by    String?   @db.Uuid
   updated_by    String?   @db.Uuid
   deleted_by    String?   @db.Uuid
+  wedding       Wedding   @relation("InvitationToWedding", fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
 
   @@index([token], map: "idx_invitations_token")
   @@index([email], map: "idx_invitations_email")
@@ -97,85 +97,3 @@ model Invitation {
   @@map("invitations")
 }
 
-/// Plan model for subscription pricing plans
-model Plan {
-  plan_id           String         @id @default(cuid())
-  name              String         @unique @db.VarChar(100)
-  display_name      String         @db.VarChar(200)
-  description       String?        @db.Text
-  price             Decimal        @db.Decimal(10, 2)
-  currency          String         @default("jpy") @db.VarChar(3)
-  stripe_price_id   String?        @unique @db.VarChar(255)
-  stripe_product_id String?        @db.VarChar(255)
-  max_storage_gb    Int            @default(10)
-  max_media_count   Int?
-  features          Json
-  is_active         Boolean        @default(true)
-  created_at        DateTime       @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime       @default(now()) @db.Timestamptz(6)
-  deleted_at        DateTime?      @db.Timestamptz(6)
-  created_by        String?        @db.Uuid
-  updated_by        String?        @db.Uuid
-  deleted_by        String?        @db.Uuid
-  subscriptions     Subscription[]
-
-  @@index([is_active], map: "idx_plans_is_active")
-  @@index([deleted_at], map: "idx_plans_deleted_at")
-  @@map("plans")
-}
-
-/// Subscription model for tracking wedding subscriptions
-model Subscription {
-  subscription_id        String    @id @default(cuid())
-  wedding_id             String    @unique @db.Uuid
-  plan_id                String
-  stripe_subscription_id String?   @unique @db.VarChar(255)
-  stripe_customer_id     String?   @db.VarChar(255)
-  status                 String    @default("active") @db.VarChar(50)
-  current_period_start   DateTime? @db.Timestamptz(6)
-  current_period_end     DateTime? @db.Timestamptz(6)
-  cancel_at_period_end   Boolean   @default(false)
-  cancel_at              DateTime? @db.Timestamptz(6)
-  canceled_at            DateTime? @db.Timestamptz(6)
-  trial_start            DateTime? @db.Timestamptz(6)
-  trial_end              DateTime? @db.Timestamptz(6)
-  created_at             DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime  @default(now()) @db.Timestamptz(6)
-  deleted_at             DateTime? @db.Timestamptz(6)
-  created_by             String?   @db.Uuid
-  updated_by             String?   @db.Uuid
-  deleted_by             String?   @db.Uuid
-  wedding                Wedding   @relation(fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
-  plan                   Plan      @relation(fields: [plan_id], references: [plan_id], onDelete: Restrict)
-
-  @@index([wedding_id], map: "idx_subscriptions_wedding_id")
-  @@index([status], map: "idx_subscriptions_status")
-  @@index([deleted_at], map: "idx_subscriptions_deleted_at")
-  @@map("subscriptions")
-}
-
-/// Payment model for tracking payment transactions
-model Payment {
-  payment_id               String    @id @default(cuid())
-  wedding_id               String    @db.Uuid
-  stripe_payment_intent_id String    @unique @db.VarChar(255)
-  stripe_charge_id         String?   @db.VarChar(255)
-  amount                   Decimal   @db.Decimal(10, 2)
-  currency                 String    @default("jpy") @db.VarChar(3)
-  status                   String    @db.VarChar(50)
-  payment_method           String?   @db.VarChar(100)
-  description              String?   @db.Text
-  receipt_url              String?   @db.VarChar(500)
-  created_at               DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime  @default(now()) @db.Timestamptz(6)
-  deleted_at               DateTime? @db.Timestamptz(6)
-  created_by               String?   @db.Uuid
-  updated_by               String?   @db.Uuid
-  deleted_by               String?   @db.Uuid
-  wedding                  Wedding   @relation(fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
-
-  @@index([wedding_id], map: "idx_payments_wedding_id")
-  @@index([status], map: "idx_payments_status")
-  @@index([deleted_at], map: "idx_payments_deleted_at")
-  @@map("payments")
-}

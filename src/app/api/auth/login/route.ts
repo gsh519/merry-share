@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
             id: authData.user.id,
             email: authData.user.email,
             userName: user.user_name,
+            weddingId: user.wedding_id,
           },
           wedding: {
             id: user.wedding.wedding_id,

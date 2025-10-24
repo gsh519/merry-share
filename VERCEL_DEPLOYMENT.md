@@ -52,11 +52,6 @@ R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
 R2_BUCKET_NAME=your_bucket_name
 R2_PUBLIC_URL=https://your-bucket.r2.dev
 
-# Stripe Payment
-STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_your_stripe_publishable_key
-STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
-
 # Application
 NEXT_PUBLIC_APP_URL=https://your-project.vercel.app
 
@@ -95,26 +90,7 @@ npm run db:push
 # または Supabase SQL Editorで直接実行
 ```
 
-### 6. Stripe Webhookの設定
-
-#### 6-1. Webhook URLの設定
-1. [Stripe Dashboard](https://dashboard.stripe.com) → "Developers" → "Webhooks"
-2. "Add endpoint" をクリック
-3. Endpoint URL: `https://your-project.vercel.app/api/stripe/webhook`
-4. イベント選択:
-   - `checkout.session.completed`
-   - `customer.subscription.created`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-   - `invoice.payment_succeeded`
-   - `invoice.payment_failed`
-
-#### 6-2. Webhook Secretの取得
-1. 作成したWebhookの詳細ページで "Signing secret" をコピー
-2. Vercelの環境変数 `STRIPE_WEBHOOK_SECRET` に設定
-3. Vercelで再デプロイ
-
-### 7. カスタムドメインの設定（オプション）
+### 6. カスタムドメインの設定（オプション）
 
 1. Vercelプロジェクトで "Settings" → "Domains"
 2. カスタムドメインを追加
@@ -126,8 +102,6 @@ npm run db:push
 - [ ] データベース接続が正常
 - [ ] Supabase認証が動作する
 - [ ] 画像/動画のアップロードが動作（R2連携）
-- [ ] Stripe決済が動作
-- [ ] Webhookが正常に受信される
 
 ## 🔄 継続的デプロイ
 
@@ -160,12 +134,6 @@ git push origin main
 - DATABASE_URLとDIRECT_URLが正しく設定されているか確認
 - Supabaseプロジェクトが一時停止していないか確認
 
-### Stripe Webhookが動作しない
-
-- Webhook URLが正しいか確認
-- STRIPE_WEBHOOK_SECRETが正しく設定されているか確認
-- Stripeダッシュボードでイベントログを確認
-
 ## 📊 モニタリング
 
 Vercelダッシュボードで以下を確認できます：
@@ -189,8 +157,7 @@ Vercelダッシュボードで以下を確認できます：
 ### 本番環境での注意事項
 
 1. **環境変数の保護**: 絶対にGitにコミットしない
-2. **Stripe本番キー**: テストモードから本番モードに切り替え
-3. **NEXTAUTH_SECRET**: 強力なランダム文字列を使用
+2. **NEXTAUTH_SECRET**: 強力なランダム文字列を使用
    ```bash
    openssl rand -base64 32
    ```
