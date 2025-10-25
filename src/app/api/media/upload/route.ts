@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { uploadToR2, generateR2Key } from '@/lib/r2';
 import { prisma } from '@/lib/prisma';
 import { optimizeMedia } from '@/lib/imageOptimizer';
+import { supabaseServer } from '@/lib/supabase-server';
 
 // アップロード可能なファイル形式
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -11,16 +12,65 @@ const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
 // 最大ファイルサイズ (100MB)
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
-// TODO: 認証実装後、ログインユーザーのweddingIdを取得する
-const TEMP_WEDDING_ID = '40e193df-f6cc-410d-8252-ec8b40497242';
-
 export async function POST(request: NextRequest) {
   try {
     console.log('[API /media/upload] Request received');
+
+    // 認証トークンを取得
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { success: false, error: '認証が必要です' },
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    // トークンを検証してユーザー情報を取得
+    const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('[API /media/upload] Auth error:', authError);
+      return NextResponse.json(
+        { success: false, error: '認証に失敗しました' },
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ユーザー情報からwedding_idを取得
+    const dbUser = await prisma.user.findUnique({
+      where: { user_id: user.id },
+      select: { wedding_id: true },
+    });
+
+    if (!dbUser) {
+      console.error('[API /media/upload] User not found in database:', user.id);
+      return NextResponse.json(
+        { success: false, error: 'ユーザー情報が見つかりません' },
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const weddingId = dbUser.wedding_id;
+
+    // wedding_idが実際に存在するか検証
+    const weddingExists = await prisma.wedding.findUnique({
+      where: { wedding_id: weddingId },
+      select: { wedding_id: true },
+    });
+
+    if (!weddingExists) {
+      console.error('[API /media/upload] Wedding not found:', weddingId);
+      return NextResponse.json(
+        { success: false, error: '結婚式情報が見つかりません' },
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const postedUserName = formData.get('postedUserName') as string;
-    const weddingId = TEMP_WEDDING_ID;
 
     // バリデーション
     if (!file) {
@@ -119,6 +169,23 @@ export async function POST(request: NextRequest) {
     // スタックトレースも出力
     if (error instanceof Error) {
       console.error('[API /media/upload] Error stack:', error.stack);
+    }
+
+    // Prisma外部キー制約エラーの詳細なハンドリング
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
+      console.error('[API /media/upload] Foreign key constraint error - wedding_id might not exist');
+      return NextResponse.json(
+        {
+          success: false,
+          error: '結婚式情報が見つかりません。アカウント設定を確認してください',
+        },
+        {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
     }
 
     // 必ずJSONレスポンスを返す
