@@ -8,9 +8,6 @@ services:
     ports:
       - "3000:3000"
     container_name: "app"
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:54322/postgres
-      - DIRECT_URL=postgresql://postgres:postgres@host.docker.internal:54322/postgres
     volumes:
       - .:/app
       - /app/.next
