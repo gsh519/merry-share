@@ -1,47 +1,10 @@
-# Dependencies
-node_modules
-npm-debug.log
-yarn-error.log
-
-# Build outputs
-.next
-out
-dist
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Database
-# prisma/migrations - コメントアウト: Vercelでは必要な場合がある
-*.db
-*.db-journal
-
 # Docker
 Dockerfile
 .dockerignore
 docker-compose.yml
 
-# Documentation (optional - コメントアウトを外すとドキュメントもアップロードされません)
-# *.md
-
-# Testing
-coverage
-.nyc_output
-
 # IDE
-.vscode
-.idea
-*.swp
-*.swo
-*~
+.vscode/settings.json
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Misc
-# .git は Vercel が自動的に処理するため、明示的に無視する必要はありません
+# Documentation
+README.md
