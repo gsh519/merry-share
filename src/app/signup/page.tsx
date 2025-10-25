@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import SignUpForm from '@/components/SignUpForm'
 import { Heart } from 'lucide-react'
 
@@ -19,7 +20,22 @@ export default function SignUpPage() {
           </p>
         </div>
 
-        <SignUpForm />
+        <Suspense fallback={
+          <div className="max-w-md mx-auto mt-8 p-8 bg-white/80 backdrop-blur-md border-2 border-rose-200 rounded-2xl shadow-xl">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-rose-400 to-pink-400 rounded-full mb-4 animate-pulse">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-rose-500 to-pink-500 bg-clip-text text-transparent mb-4">
+                読み込み中...
+              </h2>
+            </div>
+          </div>
+        }>
+          <SignUpForm />
+        </Suspense>
       </div>
     </div>
   )
