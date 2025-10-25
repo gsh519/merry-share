@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
 
     const weddingId = dbUser.wedding_id;
 
+    console.log('[API /media/upload] Wedding ID:', weddingId);
+
     // wedding_idが実際に存在するか検証
     const weddingExists = await prisma.wedding.findUnique({
       where: { wedding_id: weddingId },
