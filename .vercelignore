@@ -16,7 +16,7 @@ dist
 .env.production.local
 
 # Database
-prisma/migrations
+# prisma/migrations - コメントアウト: Vercelでは必要な場合がある
 *.db
 *.db-journal
 
