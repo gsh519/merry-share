@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic'
+
 const PAGE_SIZE = 12; // 1ページあたりの画像数
 
 export async function GET(request: Request) {

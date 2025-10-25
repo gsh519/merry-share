@@ -44,4 +44,4 @@ coverage
 Thumbs.db
 
 # Misc
-.git
+# .git は Vercel が自動的に処理するため、明示的に無視する必要はありません
