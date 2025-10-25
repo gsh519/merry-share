@@ -38,11 +38,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('[API /media/upload] ここまでは来てる');
+
     // ユーザー情報からwedding_idを取得
     const dbUser = await prisma.user.findUnique({
       where: { user_id: user.id },
       select: { wedding_id: true },
     });
+
+    console.log('[API /media/upload] dbUser', dbUser);
 
     if (!dbUser) {
       console.error('[API /media/upload] User not found in database:', user.id);
