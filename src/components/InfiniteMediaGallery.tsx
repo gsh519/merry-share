@@ -16,6 +16,12 @@ export function InfiniteMediaGallery({
   initialMedia,
   initialHasMore
 }: InfiniteMediaGalleryProps) {
+  console.log('[InfiniteMediaGallery] Initialized with:', {
+    initialMediaCount: initialMedia.length,
+    initialHasMore,
+    initialMedia
+  });
+
   const [medias, setMedias] = useState<Media[]>(initialMedia);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialHasMore);
