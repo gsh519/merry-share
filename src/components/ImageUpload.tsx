@@ -33,6 +33,12 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
     setUploadProgress({ current: 0, total: selectedFiles.length });
 
     try {
+      // 認証トークンを取得
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        throw new Error('認証情報が見つかりません。再度ログインしてください。');
+      }
+
       // 各ファイルを順番にアップロード
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
@@ -44,6 +50,9 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
 
         const response = await fetch("/api/media/upload", {
           method: "POST",
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
           body: formData,
         });
 

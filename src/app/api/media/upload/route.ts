@@ -16,9 +16,10 @@ export async function POST(request: NextRequest) {
   try {
     console.log('[API /media/upload] Request received');
 
-    // 認証トークンを取得
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // 認証トークンを取得（他のAPIと同じパターン）
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      console.error('[API /media/upload] No authorization header');
       return NextResponse.json(
         { success: false, error: '認証が必要です' },
         { status: 401, headers: { 'Content-Type': 'application/json' } }
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    console.log('[API /media/upload] Token received, length:', token.length);
 
     // トークンを検証してユーザー情報を取得
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[API /media/upload] ここまでは来てる');
+    console.log('[API /media/upload] User authenticated:', user.id);
 
     // ユーザー情報からwedding_idを取得
     const dbUser = await prisma.user.findUnique({
