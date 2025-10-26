@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { uploadToR2, generateR2Key } from '@/lib/r2';
 import { prisma } from '@/lib/prisma';
 import { optimizeMedia } from '@/lib/imageOptimizer';
@@ -160,6 +161,10 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('[API /media/upload] Media saved to DB:', { mediaId: media.media_id });
+
+    // トップページのキャッシュを再検証して新しい画像を表示
+    revalidatePath('/', 'page');
+    console.log('[API /media/upload] Revalidated path: /');
 
     return NextResponse.json({
       success: true,
