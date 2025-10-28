@@ -90,6 +90,37 @@ export function InfiniteMediaGallery({
     setSelectedMediaIds(new Set());
   };
 
+  const downloadMedia = async (mediaPath: string, fileName: string, mimeType: string) => {
+    const response = await fetch(
+      `/api/media/download?url=${encodeURIComponent(mediaPath)}&filename=${encodeURIComponent(fileName)}`
+    );
+
+    if (!response.ok) {
+      throw new Error('ダウンロードに失敗しました');
+    }
+
+    const blob = await response.blob();
+    // 正しいMIMEタイプでBlobを作成
+    const typedBlob = new Blob([blob], { type: mimeType });
+    const url = window.URL.createObjectURL(typedBlob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+
+    // iOSでの動作を改善するための設定
+    link.setAttribute('target', '_blank');
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // URLを少し遅延させて解放（iOSでの問題を回避）
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 100);
+  };
+
   const handleBulkDownload = async () => {
     if (selectedMediaIds.size === 0) {
       alert('ダウンロードする画像を選択してください');
@@ -104,27 +135,15 @@ export function InfiniteMediaGallery({
         const media = selectedMedias[i];
         const isVideo = media.media_type === 'video';
         const extension = isVideo ? 'mp4' : 'jpg';
+        const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
         const fileName = `merry-share-${media.media_id}.${extension}`;
 
-        const response = await fetch(
-          `/api/media/download?url=${encodeURIComponent(media.media_path)}&filename=${encodeURIComponent(fileName)}`
-        );
-
-        if (!response.ok) {
-          console.error(`Failed to download ${fileName}`);
+        try {
+          await downloadMedia(media.media_path, fileName, mimeType);
+        } catch (error) {
+          console.error(`Failed to download ${fileName}:`, error);
           continue;
         }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
 
         // ダウンロード間に少し待機（ブラウザの制限を回避）
         if (i < selectedMedias.length - 1) {
@@ -414,27 +433,11 @@ export function InfiniteMediaGallery({
                   e.stopPropagation();
                   const isVideo = lightboxMedia.media_type === 'video';
                   const extension = isVideo ? 'mp4' : 'jpg';
+                  const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
                   const fileName = `merry-share-${lightboxMedia.media_id}.${extension}`;
 
                   try {
-                    const response = await fetch(
-                      `/api/media/download?url=${encodeURIComponent(lightboxMedia.media_path)}&filename=${encodeURIComponent(fileName)}`
-                    );
-
-                    if (!response.ok) {
-                      throw new Error('ダウンロードに失敗しました');
-                    }
-
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = fileName;
-
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
+                    await downloadMedia(lightboxMedia.media_path, fileName, mimeType);
                   } catch (error) {
                     console.error('ダウンロードに失敗しました:', error);
                     alert('ダウンロードに失敗しました');
@@ -467,8 +470,8 @@ function MediaCard({ media, selectionMode, isSelected, onToggleSelection, onMedi
 
   const handleDownload = async () => {
     try {
-      // APIルート経由でダウンロード
       const extension = isVideo ? 'mp4' : 'jpg';
+      const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
       const fileName = `merry-share-${media.media_id}.${extension}`;
 
       const response = await fetch(`/api/media/download?url=${encodeURIComponent(media.media_path)}&filename=${encodeURIComponent(fileName)}`);
@@ -478,15 +481,25 @@ function MediaCard({ media, selectionMode, isSelected, onToggleSelection, onMedi
       }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      // 正しいMIMEタイプでBlobを作成
+      const typedBlob = new Blob([blob], { type: mimeType });
+      const url = window.URL.createObjectURL(typedBlob);
+
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
 
+      // iOSでの動作を改善するための設定
+      link.setAttribute('target', '_blank');
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+
+      // URLを少し遅延させて解放（iOSでの問題を回避）
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 100);
     } catch (error) {
       console.error('ダウンロードに失敗しました:', error);
       alert('ダウンロードに失敗しました');
