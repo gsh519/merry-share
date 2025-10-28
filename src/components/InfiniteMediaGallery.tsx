@@ -10,15 +10,18 @@ type Media = PrismaMedia;
 interface InfiniteMediaGalleryProps {
   initialMedia: Media[];
   initialHasMore: boolean;
+  weddingId: string;
 }
 
 export function InfiniteMediaGallery({
   initialMedia,
-  initialHasMore
+  initialHasMore,
+  weddingId
 }: InfiniteMediaGalleryProps) {
   console.log('[InfiniteMediaGallery] Initialized with:', {
     initialMediaCount: initialMedia.length,
     initialHasMore,
+    weddingId,
     initialMedia
   });
 
@@ -42,7 +45,7 @@ export function InfiniteMediaGallery({
     setLoading(true);
     try {
       const nextPage = page + 1;
-      const response = await fetch(`/api/media?page=${nextPage}`);
+      const response = await fetch(`/api/media?page=${nextPage}&wedding_id=${weddingId}`);
       const data = await response.json();
 
       if (data.media && data.media.length > 0) {
@@ -57,7 +60,7 @@ export function InfiniteMediaGallery({
     } finally {
       setLoading(false);
     }
-  }, [loading, hasMore, page]);
+  }, [loading, hasMore, page, weddingId]);
 
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode);

@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
-import { QrCode, Download, X } from 'lucide-react';
+import { QrCode, Download, X, Copy, Check } from 'lucide-react';
 
 export function QRCodeGenerator() {
   const [showQR, setShowQR] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [mounted, setMounted] = useState(false);
+  const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -50,6 +51,17 @@ export function QRCodeGenerator() {
       link.download = 'merry-share-qr.png';
       link.href = qrCodeUrl;
       link.click();
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      const currentUrl = window.location.href;
+      await navigator.clipboard.writeText(currentUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('リンクのコピーに失敗しました:', err);
     }
   };
 
@@ -95,14 +107,35 @@ export function QRCodeGenerator() {
           </p>
         </div>
 
-        {/* ダウンロードボタン */}
-        <button
-          onClick={handleDownload}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
-        >
-          <Download className="w-5 h-5" />
-          <span className="font-medium">QRコードをダウンロード</span>
-        </button>
+        {/* ボタングループ */}
+        <div className="space-y-3">
+          {/* リンクをコピーボタン */}
+          <button
+            onClick={handleCopyLink}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+          >
+            {copied ? (
+              <>
+                <Check className="w-5 h-5" />
+                <span className="font-medium">コピーしました！</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-5 h-5" />
+                <span className="font-medium">リンクをコピー</span>
+              </>
+            )}
+          </button>
+
+          {/* ダウンロードボタン */}
+          <button
+            onClick={handleDownload}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+          >
+            <Download className="w-5 h-5" />
+            <span className="font-medium">QRコードをダウンロード</span>
+          </button>
+        </div>
       </div>
     </div>
   ) : null;
