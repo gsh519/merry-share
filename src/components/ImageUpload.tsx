@@ -2,10 +2,71 @@
 
 import { useState, useRef } from "react";
 import { Upload, X, Camera, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface ImageUploadProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+// クライアント側で画像を圧縮する関数
+async function compressImage(file: File): Promise<File> {
+  // 動画やGIFは圧縮しない
+  if (file.type.startsWith('video/') || file.type === 'image/gif') {
+    return file;
+  }
+
+  // 画像のみ圧縮
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        // 最大サイズを設定（長辺2048pxまで）
+        const maxSize = 2048;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height && width > maxSize) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // WebPで圧縮（品質0.85）
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), {
+                type: 'image/webp',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/webp',
+          0.85
+        );
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
@@ -15,6 +76,7 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -39,13 +101,14 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
         throw new Error('認証情報が見つかりません。再度ログインしてください。');
       }
 
-      // 各ファイルを順番にアップロード
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
-        setUploadProgress({ current: i + 1, total: selectedFiles.length });
+      // すべてのファイルを並列でアップロード
+      let completedCount = 0;
+      const uploadPromises = selectedFiles.map(async (file) => {
+        // クライアント側で画像を圧縮
+        const compressedFile = await compressImage(file);
 
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", compressedFile);
         formData.append("postedUserName", userName.trim());
 
         const response = await fetch("/api/media/upload", {
@@ -62,16 +125,24 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
           throw new Error(data.error || `ファイル ${file.name} のアップロードに失敗しました`);
         }
 
-        console.log(`Upload success (${i + 1}/${selectedFiles.length}):`, data);
-      }
+        // 進捗を更新
+        completedCount++;
+        setUploadProgress({ current: completedCount, total: selectedFiles.length });
+        console.log(`Upload success (${completedCount}/${selectedFiles.length}):`, data);
+
+        return data;
+      });
+
+      // すべてのアップロードが完了するまで待つ
+      await Promise.all(uploadPromises);
 
       // 成功したらリセットして閉じる
       setSelectedFiles([]);
       setUserName("");
       onClose();
 
-      // ページをリロードして新しい画像を表示
-      window.location.reload();
+      // Router.refresh()を使ってサーバーコンポーネントを再フェッチ（ページリロードより高速）
+      router.refresh();
     } catch (err) {
       console.error("Upload error:", err);
       setError(err instanceof Error ? err.message : "アップロードに失敗しました");

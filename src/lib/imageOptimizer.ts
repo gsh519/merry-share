@@ -17,11 +17,23 @@ export async function optimizeImage(file: File): Promise<{ buffer: Buffer; conte
     };
   }
 
+  // クライアント側で既にWebPに変換済みの場合は、軽量な処理のみ実施
+  if (file.type === 'image/webp') {
+    // EXIF orientation のみ修正して返す（effortを下げて高速化）
+    const optimizedBuffer = await sharp(buffer)
+      .rotate() // EXIF orientationに基づく自動回転
+      .webp({ quality: 90, effort: 2 }) // 既に圧縮済みなので高品質・低effortで高速化
+      .toBuffer();
+
+    return {
+      buffer: optimizedBuffer,
+      contentType: 'image/webp',
+      extension: '.webp',
+    };
+  }
+
   // Sharp で画像を処理
   let image = sharp(buffer);
-
-  // メタデータを取得して画像の向きを確認
-  const metadata = await image.metadata();
 
   // 画像の向きを自動修正（EXIF orientationに基づく）
   image = image.rotate();

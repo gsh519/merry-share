@@ -90,7 +90,7 @@ export function InfiniteMediaGallery({
     setSelectedMediaIds(new Set());
   };
 
-  const downloadMedia = async (mediaPath: string, fileName: string, mimeType: string, showInstruction: boolean = true) => {
+  const downloadMedia = async (mediaPath: string, fileName: string, mimeType: string, useShareAPI: boolean = true) => {
     const response = await fetch(
       `/api/media/download?url=${encodeURIComponent(mediaPath)}&filename=${encodeURIComponent(fileName)}`
     );
@@ -106,17 +106,15 @@ export function InfiniteMediaGallery({
     // モバイルデバイスの判定
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-    // Web Share APIが利用可能な場合（主にモバイル）
-    if (isMobile && navigator.share && navigator.canShare) {
+    // Web Share APIが利用可能な場合（主にモバイル）かつ使用を許可されている場合
+    if (useShareAPI && isMobile && navigator.share && navigator.canShare) {
       try {
         const file = new File([typedBlob], fileName, { type: mimeType });
 
         // canShareでファイル共有がサポートされているか確認
         if (navigator.canShare({ files: [file] })) {
           // 操作方法のアナウンスを表示
-          if (showInstruction) {
-            alert('下の「画像を保存」から保存しましょう');
-          }
+          alert('下の「画像を保存」から保存しましょう');
 
           await navigator.share({
             files: [file],
@@ -173,8 +171,8 @@ export function InfiniteMediaGallery({
         const fileName = `merry-share-${media.media_id}.${extension}`;
 
         try {
-          // 最初の画像の時だけアナウンスを表示
-          await downloadMedia(media.media_path, fileName, mimeType, i === 0);
+          // 一括ダウンロードの場合はWeb Share APIを使用しない
+          await downloadMedia(media.media_path, fileName, mimeType, false);
         } catch (error) {
           console.error(`Failed to download ${fileName}:`, error);
           continue;
