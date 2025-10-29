@@ -102,20 +102,49 @@ export function InfiniteMediaGallery({
     const blob = await response.blob();
     // 正しいMIMEタイプでBlobを作成
     const typedBlob = new Blob([blob], { type: mimeType });
-    const url = window.URL.createObjectURL(typedBlob);
 
+    // モバイルデバイスの判定
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    // Web Share APIが利用可能な場合（主にモバイル）
+    if (isMobile && navigator.share && navigator.canShare) {
+      try {
+        const file = new File([typedBlob], fileName, { type: mimeType });
+
+        // canShareでファイル共有がサポートされているか確認
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Merry Share',
+            text: '写真を保存'
+          });
+          return;
+        }
+      } catch (error) {
+        // ユーザーがキャンセルした場合はエラーを無視
+        if ((error as Error).name === 'AbortError') {
+          return;
+        }
+        // その他のエラーの場合は通常のダウンロードにフォールバック
+        console.log('Share API failed, falling back to download:', error);
+      }
+    }
+
+    // 通常のダウンロード処理（PC、またはShare APIが使えない場合）
+    const url = window.URL.createObjectURL(typedBlob);
     const link = document.createElement('a');
     link.href = url;
     link.download = fileName;
 
-    // iOSでの動作を改善するための設定
-    link.setAttribute('target', '_blank');
+    if (isMobile) {
+      // モバイルの場合は新しいタブで開く
+      link.setAttribute('target', '_blank');
+    }
 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
-    // URLを少し遅延させて解放（iOSでの問題を回避）
     setTimeout(() => {
       window.URL.revokeObjectURL(url);
     }, 100);
