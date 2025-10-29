@@ -90,7 +90,7 @@ export function InfiniteMediaGallery({
     setSelectedMediaIds(new Set());
   };
 
-  const downloadMedia = async (mediaPath: string, fileName: string, mimeType: string) => {
+  const downloadMedia = async (mediaPath: string, fileName: string, mimeType: string, showInstruction: boolean = true) => {
     const response = await fetch(
       `/api/media/download?url=${encodeURIComponent(mediaPath)}&filename=${encodeURIComponent(fileName)}`
     );
@@ -113,6 +113,11 @@ export function InfiniteMediaGallery({
 
         // canShareでファイル共有がサポートされているか確認
         if (navigator.canShare({ files: [file] })) {
+          // 操作方法のアナウンスを表示
+          if (showInstruction) {
+            alert('下の「画像を保存」から保存しましょう');
+          }
+
           await navigator.share({
             files: [file],
             title: 'Merry Share',
@@ -168,7 +173,8 @@ export function InfiniteMediaGallery({
         const fileName = `merry-share-${media.media_id}.${extension}`;
 
         try {
-          await downloadMedia(media.media_path, fileName, mimeType);
+          // 最初の画像の時だけアナウンスを表示
+          await downloadMedia(media.media_path, fileName, mimeType, i === 0);
         } catch (error) {
           console.error(`Failed to download ${fileName}:`, error);
           continue;
