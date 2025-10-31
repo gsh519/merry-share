@@ -2,71 +2,12 @@
 
 import { useState, useRef } from "react";
 import { Upload, X, Camera, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useBackgroundUpload } from "@/hooks/useBackgroundUpload";
+import { BackgroundUploadToast } from "./BackgroundUploadToast";
 
 interface ImageUploadProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-// クライアント側で画像を圧縮する関数
-async function compressImage(file: File): Promise<File> {
-  // 動画やGIFは圧縮しない
-  if (file.type.startsWith('video/') || file.type === 'image/gif') {
-    return file;
-  }
-
-  // 画像のみ圧縮
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(file);
-          return;
-        }
-
-        // 最大サイズを設定（長辺2048pxまで）
-        const maxSize = 2048;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height && width > maxSize) {
-          height = (height * maxSize) / width;
-          width = maxSize;
-        } else if (height > maxSize) {
-          width = (width * maxSize) / height;
-          height = maxSize;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // WebPで圧縮（品質0.85）
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), {
-                type: 'image/webp',
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
-            } else {
-              resolve(file);
-            }
-          },
-          'image/webp',
-          0.85
-        );
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
 }
 
 export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
@@ -76,7 +17,9 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
+
+  // バックグラウンドアップロード機能
+  const { tasks, addTask, clearTask, threshold } = useBackgroundUpload();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -90,6 +33,19 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
       return;
     }
 
+    // ファイル数が閾値以上の場合、バックグラウンド処理
+    if (selectedFiles.length >= threshold) {
+      const started = await addTask(selectedFiles, userName);
+      if (started) {
+        // バックグラウンド処理開始
+        setSelectedFiles([]);
+        setUserName("");
+        onClose();
+        return;
+      }
+    }
+
+    // 通常のアップロード処理（5件未満）
     setIsUploading(true);
     setError(null);
     setUploadProgress({ current: 0, total: selectedFiles.length });
@@ -101,14 +57,13 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
         throw new Error('認証情報が見つかりません。再度ログインしてください。');
       }
 
-      // すべてのファイルを並列でアップロード
-      let completedCount = 0;
-      const uploadPromises = selectedFiles.map(async (file) => {
-        // クライアント側で画像を圧縮
-        const compressedFile = await compressImage(file);
+      // 各ファイルを順番にアップロード
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        setUploadProgress({ current: i + 1, total: selectedFiles.length });
 
         const formData = new FormData();
-        formData.append("file", compressedFile);
+        formData.append("file", file);
         formData.append("postedUserName", userName.trim());
 
         const response = await fetch("/api/media/upload", {
@@ -125,24 +80,16 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
           throw new Error(data.error || `ファイル ${file.name} のアップロードに失敗しました`);
         }
 
-        // 進捗を更新
-        completedCount++;
-        setUploadProgress({ current: completedCount, total: selectedFiles.length });
-        console.log(`Upload success (${completedCount}/${selectedFiles.length}):`, data);
-
-        return data;
-      });
-
-      // すべてのアップロードが完了するまで待つ
-      await Promise.all(uploadPromises);
+        console.log(`Upload success (${i + 1}/${selectedFiles.length}):`, data);
+      }
 
       // 成功したらリセットして閉じる
       setSelectedFiles([]);
       setUserName("");
       onClose();
 
-      // Router.refresh()を使ってサーバーコンポーネントを再フェッチ（ページリロードより高速）
-      router.refresh();
+      // ページをリロードして新しい画像を表示
+      window.location.reload();
     } catch (err) {
       console.error("Upload error:", err);
       setError(err instanceof Error ? err.message : "アップロードに失敗しました");
@@ -152,10 +99,16 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) return (
+    <>
+      {/* バックグラウンドアップロードのトースト通知 */}
+      <BackgroundUploadToast tasks={tasks} onClearTask={clearTask} />
+    </>
+  );
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
@@ -230,13 +183,26 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
 
           {/* File Count Display */}
           {selectedFiles.length > 0 && (
-            <div className="mt-4 p-4 bg-rose-50 rounded-xl">
+            <div className={`mt-4 p-4 rounded-xl ${
+              selectedFiles.length >= threshold
+                ? 'bg-blue-50 border border-blue-200'
+                : 'bg-rose-50'
+            }`}>
               <div className="flex items-center justify-center gap-2">
-                <div className="w-2 h-2 bg-rose-400 rounded-full"></div>
-                <p className="text-sm font-medium text-rose-700">
+                <div className={`w-2 h-2 rounded-full ${
+                  selectedFiles.length >= threshold ? 'bg-blue-400' : 'bg-rose-400'
+                }`}></div>
+                <p className={`text-sm font-medium ${
+                  selectedFiles.length >= threshold ? 'text-blue-700' : 'text-rose-700'
+                }`}>
                   {selectedFiles.length}個のファイルを選択中
                 </p>
               </div>
+              {selectedFiles.length >= threshold && (
+                <p className="text-xs text-blue-600 text-center mt-2">
+                  ※{threshold}件以上のファイルは<br></br>バックグラウンドでアップロードされます
+                </p>
+              )}
             </div>
           )}
 
@@ -284,6 +250,10 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* バックグラウンドアップロードのトースト通知 */}
+      <BackgroundUploadToast tasks={tasks} onClearTask={clearTask} />
+    </>
   );
 }
