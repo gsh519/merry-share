@@ -18,6 +18,12 @@ const nextConfig = {
       },
     ],
   },
+  // API Routeのボディサイズ制限を設定（スマホからの大容量アップロードに対応）
+  api: {
+    bodyParser: {
+      sizeLimit: '150mb',
+    },
+  },
 }
 
 module.exports = nextConfig

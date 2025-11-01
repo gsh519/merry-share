@@ -5,6 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { optimizeMedia } from '@/lib/imageOptimizer';
 import { supabaseServer } from '@/lib/supabase-server';
 
+// Next.jsのルートセグメント設定
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // 最大実行時間60秒
+
 // アップロード可能なファイル形式
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
