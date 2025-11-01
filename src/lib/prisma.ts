@@ -6,23 +6,36 @@ const createPrismaClient = () => {
     throw new Error('PrismaClient is not available in the browser')
   }
 
+  // deleted_atフィルタを持つモデルを定義
+  const modelsWithDeletedAt = ['wedding', 'user', 'media', 'invitation'] as const
+
   const client = new PrismaClient().$extends({
+    name: 'softDelete',
     query: {
       $allModels: {
-        async findMany({ args, query }) {
-          args.where = { ...args.where, deleted_at: null }
+        async findMany({ args, query, model }) {
+          // deleted_atを持つモデルのみフィルタを適用
+          if (modelsWithDeletedAt.includes(model as any)) {
+            args.where = { ...args.where, deleted_at: null }
+          }
           return query(args)
         },
-        async findFirst({ args, query }) {
-          args.where = { ...args.where, deleted_at: null }
+        async findFirst({ args, query, model }) {
+          if (modelsWithDeletedAt.includes(model as any)) {
+            args.where = { ...args.where, deleted_at: null }
+          }
           return query(args)
         },
-        async findUnique({ args, query }) {
-          args.where = { ...args.where, deleted_at: null }
+        async findUnique({ args, query, model }) {
+          if (modelsWithDeletedAt.includes(model as any)) {
+            args.where = { ...args.where, deleted_at: null }
+          }
           return query(args)
         },
-        async count({ args, query }) {
-          args.where = { ...args.where, deleted_at: null }
+        async count({ args, query, model }) {
+          if (modelsWithDeletedAt.includes(model as any)) {
+            args.where = { ...args.where, deleted_at: null }
+          }
           return query(args)
         },
       },

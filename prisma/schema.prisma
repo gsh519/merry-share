@@ -97,3 +97,27 @@ model Invitation {
   @@map("invitations")
 }
 
+/// UploadJob model for managing background upload tasks
+model UploadJob {
+  job_id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wedding_id        String    @db.Uuid
+  user_id           String    @db.Uuid
+  posted_user_name  String    @db.VarChar(150)
+  total_files       Int       @default(0)
+  processed_files   Int       @default(0)
+  failed_files      Int       @default(0)
+  status            String    @default("pending") @db.VarChar(20) // pending, processing, completed, failed
+  error_message     String?   @db.Text
+  file_metadata     Json?     // Store file names and sizes
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
+  completed_at      DateTime? @db.Timestamptz(6)
+
+  @@index([job_id], map: "idx_upload_jobs_job_id")
+  @@index([wedding_id], map: "idx_upload_jobs_wedding_id")
+  @@index([user_id], map: "idx_upload_jobs_user_id")
+  @@index([status], map: "idx_upload_jobs_status")
+  @@index([created_at], map: "idx_upload_jobs_created_at")
+  @@map("upload_jobs")
+}
+

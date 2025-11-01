@@ -78,3 +78,67 @@ export async function optimizeMedia(file: File): Promise<{
     optimizedSize: result.buffer.byteLength,
   };
 }
+
+/**
+ * BufferとメタデータからFile風オブジェクトを作成し、最適化を実行
+ * バックグラウンド処理用
+ */
+export async function optimizeMediaFromBuffer(
+  buffer: Buffer,
+  contentType: string,
+  originalFileName: string
+): Promise<{
+  buffer: Buffer;
+  contentType: string;
+  originalSize: number;
+  optimizedSize: number;
+  extension?: string;
+}> {
+  const originalSize = buffer.length;
+  const isVideo = contentType.startsWith('video/');
+
+  if (isVideo) {
+    // 動画の場合はそのまま返す
+    return {
+      buffer,
+      contentType,
+      originalSize,
+      optimizedSize: buffer.length,
+    };
+  }
+
+  // 画像の場合は最適化
+
+  // GIFの場合は最適化せずそのまま返す（アニメーション保持のため）
+  if (contentType === 'image/gif') {
+    return {
+      buffer,
+      contentType,
+      originalSize,
+      optimizedSize: buffer.length,
+      extension: '.gif',
+    };
+  }
+
+  // Sharp で画像を処理
+  let image = sharp(buffer);
+
+  // 画像の向きを自動修正（EXIF orientationに基づく）
+  image = image.rotate();
+
+  // WebP形式に変換（高品質設定）
+  const optimizedBuffer = await image
+    .webp({
+      quality: 85,
+      effort: 6,
+    })
+    .toBuffer();
+
+  return {
+    buffer: optimizedBuffer,
+    contentType: 'image/webp',
+    originalSize,
+    optimizedSize: optimizedBuffer.byteLength,
+    extension: '.webp',
+  };
+}

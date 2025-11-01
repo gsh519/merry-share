@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 // Cloudflare R2 クライアントの初期化
 export const r2Client = new S3Client({
@@ -58,6 +58,62 @@ export async function uploadToR2(
     return publicUrl;
   } catch (error) {
     console.error('[R2] Upload failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * R2からファイルを取得する
+ * @param key - R2内でのファイルキー（パス）
+ * @returns ファイルのBuffer
+ */
+export async function getFromR2(key: string): Promise<Buffer> {
+  try {
+    console.log('[R2] Fetching file:', key);
+
+    const command = new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+    });
+
+    const response = await r2Client.send(command);
+
+    if (!response.Body) {
+      throw new Error('No file body returned from R2');
+    }
+
+    // ストリームをバッファに変換
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    console.log('[R2] File fetched successfully, size:', buffer.length);
+    return buffer;
+  } catch (error) {
+    console.error('[R2] Fetch failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * R2からファイルを削除する
+ * @param key - R2内でのファイルキー（パス）
+ */
+export async function deleteFromR2(key: string): Promise<void> {
+  try {
+    console.log('[R2] Deleting file:', key);
+
+    const command = new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+    });
+
+    await r2Client.send(command);
+    console.log('[R2] File deleted successfully');
+  } catch (error) {
+    console.error('[R2] Delete failed:', error);
     throw error;
   }
 }

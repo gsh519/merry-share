@@ -2,13 +2,15 @@
 
 import { useState, useRef } from "react";
 import { Upload, X, Camera, Loader2 } from "lucide-react";
-import { useBackgroundUpload } from "@/hooks/useBackgroundUpload";
-import { BackgroundUploadToast } from "./BackgroundUploadToast";
+import { UploadStatusToast } from "./UploadStatusToast";
 
 interface ImageUploadProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// バックグラウンド処理の閾値（5件以上）
+const BACKGROUND_THRESHOLD = 5;
 
 export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -16,10 +18,8 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [backgroundJobId, setBackgroundJobId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // バックグラウンドアップロード機能
-  const { tasks, addTask, clearTask, threshold } = useBackgroundUpload();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -33,22 +33,8 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
       return;
     }
 
-    // ファイル数が閾値以上の場合、バックグラウンド処理
-    if (selectedFiles.length >= threshold) {
-      const started = await addTask(selectedFiles, userName);
-      if (started) {
-        // バックグラウンド処理開始
-        setSelectedFiles([]);
-        setUserName("");
-        onClose();
-        return;
-      }
-    }
-
-    // 通常のアップロード処理（5件未満）
     setIsUploading(true);
     setError(null);
-    setUploadProgress({ current: 0, total: selectedFiles.length });
 
     try {
       // 認証トークンを取得
@@ -56,6 +42,46 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
       if (!accessToken) {
         throw new Error('認証情報が見つかりません。再度ログインしてください。');
       }
+
+      // ファイル数が閾値以上の場合、バックグラウンド処理
+      if (selectedFiles.length >= BACKGROUND_THRESHOLD) {
+        console.log(`[ImageUpload] Starting background upload for ${selectedFiles.length} files`);
+
+        const formData = new FormData();
+        selectedFiles.forEach(file => {
+          formData.append("files", file);
+        });
+        formData.append("postedUserName", userName.trim());
+
+        const response = await fetch("/api/upload/initiate", {
+          method: "POST",
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'バックグラウンドアップロードの開始に失敗しました');
+        }
+
+        console.log('[ImageUpload] Background upload initiated:', data.jobId);
+
+        // バックグラウンドジョブIDを保存
+        setBackgroundJobId(data.jobId);
+
+        // フォームをリセットして閉じる
+        setSelectedFiles([]);
+        setUserName("");
+        onClose();
+
+        return;
+      }
+
+      // 通常のアップロード処理（5件未満）
+      setUploadProgress({ current: 0, total: selectedFiles.length });
 
       // 各ファイルを順番にアップロード
       for (let i = 0; i < selectedFiles.length; i++) {
@@ -102,7 +128,7 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
   if (!isOpen) return (
     <>
       {/* バックグラウンドアップロードのトースト通知 */}
-      <BackgroundUploadToast tasks={tasks} onClearTask={clearTask} />
+      {backgroundJobId && <UploadStatusToast jobId={backgroundJobId} onClose={() => setBackgroundJobId(null)} />}
     </>
   );
 
@@ -184,23 +210,23 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
           {/* File Count Display */}
           {selectedFiles.length > 0 && (
             <div className={`mt-4 p-4 rounded-xl ${
-              selectedFiles.length >= threshold
+              selectedFiles.length >= BACKGROUND_THRESHOLD
                 ? 'bg-blue-50 border border-blue-200'
                 : 'bg-rose-50'
             }`}>
               <div className="flex items-center justify-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${
-                  selectedFiles.length >= threshold ? 'bg-blue-400' : 'bg-rose-400'
+                  selectedFiles.length >= BACKGROUND_THRESHOLD ? 'bg-blue-400' : 'bg-rose-400'
                 }`}></div>
                 <p className={`text-sm font-medium ${
-                  selectedFiles.length >= threshold ? 'text-blue-700' : 'text-rose-700'
+                  selectedFiles.length >= BACKGROUND_THRESHOLD ? 'text-blue-700' : 'text-rose-700'
                 }`}>
                   {selectedFiles.length}個のファイルを選択中
                 </p>
               </div>
-              {selectedFiles.length >= threshold && (
+              {selectedFiles.length >= BACKGROUND_THRESHOLD && (
                 <p className="text-xs text-blue-600 text-center mt-2">
-                  ※{threshold}件以上のファイルは<br></br>バックグラウンドでアップロードされます
+                  ※{BACKGROUND_THRESHOLD}件以上のファイルは<br></br>バックグラウンドでアップロードされます
                 </p>
               )}
             </div>
@@ -253,7 +279,7 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
       </div>
 
       {/* バックグラウンドアップロードのトースト通知 */}
-      <BackgroundUploadToast tasks={tasks} onClearTask={clearTask} />
+      {backgroundJobId && <UploadStatusToast jobId={backgroundJobId} onClose={() => setBackgroundJobId(null)} />}
     </>
   );
 }
