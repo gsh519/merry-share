@@ -49,8 +49,10 @@ const globalForPrisma = globalThis as unknown as {
   prisma: ReturnType<typeof createPrismaClient> | undefined
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+export const prisma = typeof window === 'undefined'
+  ? (globalForPrisma.prisma ?? createPrismaClient())
+  : ({} as ReturnType<typeof createPrismaClient>)
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && typeof window === 'undefined') {
   globalForPrisma.prisma = prisma
 }
