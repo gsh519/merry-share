@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Cloudflare R2 クライアントの初期化
 export const r2Client = new S3Client({
@@ -132,4 +133,39 @@ export function generateR2Key(weddingId: string, fileName: string, extension?: s
 
   // weddings/{wedding_id}/{timestamp}_{random}.{ext}
   return `weddings/${weddingId}/${timestamp}_${randomStr}${ext.startsWith('.') ? ext : '.' + ext}`;
+}
+
+/**
+ * R2へのプレサインドURLを生成する（直接アップロード用）
+ * @param key - R2内でのファイルキー（パス）
+ * @param contentType - ファイルのMIMEタイプ
+ * @param expiresIn - URLの有効期限（秒、デフォルト: 3600秒 = 1時間）
+ * @returns プレサインドURL
+ */
+export async function generatePresignedUrl(
+  key: string,
+  contentType: string,
+  expiresIn: number = 3600
+): Promise<string> {
+  try {
+    console.log('[R2] Generating presigned URL:', { key, contentType, expiresIn });
+
+    if (!process.env.R2_BUCKET_NAME) {
+      throw new Error('R2_BUCKET_NAME environment variable is not set');
+    }
+
+    const command = new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const presignedUrl = await getSignedUrl(r2Client, command, { expiresIn });
+    console.log('[R2] Presigned URL generated successfully');
+
+    return presignedUrl;
+  } catch (error) {
+    console.error('[R2] Failed to generate presigned URL:', error);
+    throw error;
+  }
 }

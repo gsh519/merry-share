@@ -43,48 +43,93 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
         throw new Error('認証情報が見つかりません。再度ログインしてください。');
       }
 
-      // ファイル数が閾値以上の場合、バックグラウンド処理
+      // ファイル数が閾値以上の場合、プレサインドURL方式でバックグラウンド処理
       if (selectedFiles.length >= BACKGROUND_THRESHOLD) {
-        console.log(`[ImageUpload] Starting background upload for ${selectedFiles.length} files`);
+        console.log(`[ImageUpload] Starting presigned URL upload for ${selectedFiles.length} files`);
 
-        const formData = new FormData();
-        selectedFiles.forEach(file => {
-          formData.append("files", file);
-        });
-        formData.append("postedUserName", userName.trim());
+        // Step 1: プレサインドURLを取得
+        const fileRequests = selectedFiles.map(file => ({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        }));
 
-        const response = await fetch("/api/upload/initiate", {
+        const presignedResponse = await fetch("/api/upload/presigned-url", {
           method: "POST",
           headers: {
             'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
           },
-          body: formData,
+          body: JSON.stringify({ files: fileRequests }),
         });
 
-        let data;
-        const responseText = await response.text();
-        console.log('[ImageUpload] Response status:', response.status);
-        console.log('[ImageUpload] Response text (first 500 chars):', responseText.substring(0, 500));
-
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('[ImageUpload] Failed to parse response as JSON:', parseError);
-          console.error('[ImageUpload] Full response text:', responseText);
-          throw new Error(`サーバーからの応答の解析に失敗しました (ステータス: ${response.status})`);
+        if (!presignedResponse.ok) {
+          const errorData = await presignedResponse.json();
+          throw new Error(errorData.error || 'プレサインドURLの取得に失敗しました');
         }
 
-        if (!response.ok) {
-          const errorMessage = data.error || 'バックグラウンドアップロードの開始に失敗しました';
-          const errorDetails = data.details ? ` 詳細: ${data.details}` : '';
-          console.error('[ImageUpload] Upload initiate failed:', { status: response.status, error: data });
-          throw new Error(errorMessage + errorDetails);
+        const { presignedUrls } = await presignedResponse.json();
+        console.log('[ImageUpload] Presigned URLs obtained:', presignedUrls.length);
+
+        // Step 2: 各ファイルをR2に直接アップロード
+        setUploadProgress({ current: 0, total: selectedFiles.length });
+
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          const urlData = presignedUrls[i];
+
+          setUploadProgress({ current: i + 1, total: selectedFiles.length });
+          console.log(`[ImageUpload] Uploading file ${i + 1}/${selectedFiles.length} to R2:`, file.name);
+
+          // プレサインドURLを使ってR2に直接アップロード
+          const uploadResponse = await fetch(urlData.presignedUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': file.type,
+            },
+            body: file,
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`ファイル "${file.name}" のアップロードに失敗しました`);
+          }
+
+          console.log(`[ImageUpload] File ${i + 1} uploaded successfully`);
         }
 
-        console.log('[ImageUpload] Background upload initiated:', data.jobId);
+        // Step 3: アップロード完了をサーバーに通知
+        console.log('[ImageUpload] Notifying server of upload completion');
+
+        const fileMetadata = presignedUrls.map((urlData: any) => ({
+          name: urlData.fileName,
+          type: urlData.fileType,
+          size: urlData.fileSize,
+          r2Key: urlData.r2Key,
+          tempR2Key: urlData.tempR2Key,
+        }));
+
+        const completeResponse = await fetch("/api/upload/complete", {
+          method: "POST",
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileMetadata,
+            postedUserName: userName.trim(),
+          }),
+        });
+
+        if (!completeResponse.ok) {
+          const errorData = await completeResponse.json();
+          throw new Error(errorData.error || 'アップロード完了通知に失敗しました');
+        }
+
+        const completeData = await completeResponse.json();
+        console.log('[ImageUpload] Upload complete, job started:', completeData.jobId);
 
         // バックグラウンドジョブIDを保存
-        setBackgroundJobId(data.jobId);
+        setBackgroundJobId(completeData.jobId);
 
         // フォームをリセットして閉じる
         setSelectedFiles([]);
