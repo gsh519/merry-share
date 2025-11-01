@@ -317,12 +317,6 @@ export function InfiniteMediaGallery({
         </div>
       )}
 
-      {!hasMore && medias.length > 0 && (
-        <div className="text-center py-8 text-gray-500">
-          すべての写真を表示しました
-        </div>
-      )}
-
       {/* 選択モードボタン（通常時） */}
       {!selectionMode && (
         <button
