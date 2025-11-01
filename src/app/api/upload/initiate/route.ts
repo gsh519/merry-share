@@ -130,12 +130,16 @@ export async function POST(request: NextRequest) {
       const r2Key = generateR2Key(weddingId, file.name, extension);
       const tempR2Key = `temp/${r2Key}`; // 一時保存用のパス
 
+      // シリアライズ可能なプレーンオブジェクトとして保存
+      // ファイル名の特殊文字をサニタイズ
+      const sanitizedName = String(file.name).normalize('NFC').replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+
       fileMetadata.push({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        r2Key,
-        tempR2Key,
+        name: sanitizedName,
+        type: String(file.type),
+        size: Number(file.size),
+        r2Key: String(r2Key),
+        tempR2Key: String(tempR2Key),
       });
     }
 
@@ -165,20 +169,36 @@ export async function POST(request: NextRequest) {
     console.log('[API /upload/initiate] All files uploaded to R2 (temp)');
 
     // Step 2: DBにジョブを作成
-    const uploadJob = await prisma.uploadJob.create({
-      data: {
-        wedding_id: weddingId,
-        user_id: user.id,
-        posted_user_name: postedUserName,
-        total_files: files.length,
-        processed_files: 0,
-        failed_files: 0,
-        status: 'pending',
-        file_metadata: fileMetadata,
-      },
+    console.log('[API /upload/initiate] Creating upload job with metadata:', {
+      weddingId,
+      userId: user.id,
+      postedUserName,
+      totalFiles: files.length,
+      metadataLength: fileMetadata.length,
+      // 最初のファイルのメタデータをサンプルとして出力
+      sampleMetadata: fileMetadata[0],
     });
 
-    console.log('[API /upload/initiate] Upload job created:', uploadJob.job_id);
+    let uploadJob;
+    try {
+      uploadJob = await prisma.uploadJob.create({
+        data: {
+          wedding_id: weddingId,
+          user_id: user.id,
+          posted_user_name: postedUserName,
+          total_files: files.length,
+          processed_files: 0,
+          failed_files: 0,
+          status: 'pending',
+          file_metadata: fileMetadata,
+        },
+      });
+      console.log('[API /upload/initiate] Upload job created successfully:', uploadJob.job_id);
+    } catch (dbError) {
+      console.error('[API /upload/initiate] Database error when creating job:', dbError);
+      console.error('[API /upload/initiate] File metadata that caused error:', JSON.stringify(fileMetadata, null, 2));
+      throw new Error(`ジョブの作成に失敗しました: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
+    }
 
     // Step 3: バックグラウンド処理を開始
     try {

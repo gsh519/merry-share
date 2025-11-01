@@ -61,10 +61,19 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
           body: formData,
         });
 
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          console.error('[ImageUpload] Failed to parse response:', parseError);
+          throw new Error(`サーバーからの応答の解析に失敗しました (ステータス: ${response.status})`);
+        }
 
         if (!response.ok) {
-          throw new Error(data.error || 'バックグラウンドアップロードの開始に失敗しました');
+          const errorMessage = data.error || 'バックグラウンドアップロードの開始に失敗しました';
+          const errorDetails = data.details ? ` 詳細: ${data.details}` : '';
+          console.error('[ImageUpload] Upload initiate failed:', { status: response.status, error: data });
+          throw new Error(errorMessage + errorDetails);
         }
 
         console.log('[ImageUpload] Background upload initiated:', data.jobId);
