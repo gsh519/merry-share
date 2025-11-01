@@ -62,10 +62,15 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
         });
 
         let data;
+        const responseText = await response.text();
+        console.log('[ImageUpload] Response status:', response.status);
+        console.log('[ImageUpload] Response text (first 500 chars):', responseText.substring(0, 500));
+
         try {
-          data = await response.json();
+          data = JSON.parse(responseText);
         } catch (parseError) {
-          console.error('[ImageUpload] Failed to parse response:', parseError);
+          console.error('[ImageUpload] Failed to parse response as JSON:', parseError);
+          console.error('[ImageUpload] Full response text:', responseText);
           throw new Error(`サーバーからの応答の解析に失敗しました (ステータス: ${response.status})`);
         }
 

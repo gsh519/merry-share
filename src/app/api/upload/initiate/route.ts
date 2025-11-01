@@ -81,9 +81,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (formDataError) {
+      console.error('[API /upload/initiate] Failed to parse FormData:', formDataError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'リクエストデータの解析に失敗しました',
+          details: formDataError instanceof Error ? formDataError.message : 'Unknown error'
+        },
+        { status: 400 }
+      );
+    }
+
     const files = formData.getAll('files') as File[];
     const postedUserName = formData.get('postedUserName') as string;
+
+    console.log('[API /upload/initiate] FormData parsed:', {
+      filesCount: files.length,
+      postedUserName,
+      fileNames: files.map(f => f.name),
+      fileSizes: files.map(f => f.size),
+    });
 
     // バリデーション
     if (files.length === 0) {
@@ -147,10 +168,13 @@ export async function POST(request: NextRequest) {
 
     // Step 1: ファイルをR2に一時アップロード（最適化せずにそのまま）
     const uploadPromises = files.map(async (file, index) => {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const metadata = fileMetadata[index];
-
       try {
+        console.log(`[API /upload/initiate] Processing file ${index + 1}/${files.length}: ${file.name}`);
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const metadata = fileMetadata[index];
+
+        console.log(`[API /upload/initiate] File ${index + 1} buffer size:`, buffer.length);
+
         // 一時フォルダにアップロード（バックグラウンド処理で最適化してから本番フォルダに移動）
         await uploadToR2(
           buffer,
@@ -158,15 +182,31 @@ export async function POST(request: NextRequest) {
           file.type,
           file.size
         );
+        console.log(`[API /upload/initiate] File ${index + 1} uploaded successfully`);
         return { success: true };
       } catch (error) {
-        console.error(`[API /upload/initiate] Failed to upload ${file.name}:`, error);
-        throw new Error(`ファイル "${file.name}" のアップロードに失敗しました`);
+        console.error(`[API /upload/initiate] Failed to upload file ${index + 1} (${file.name}):`, error);
+        if (error instanceof Error) {
+          console.error(`[API /upload/initiate] Error stack:`, error.stack);
+        }
+        throw new Error(`ファイル "${file.name}" のアップロードに失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     });
 
-    await Promise.all(uploadPromises);
-    console.log('[API /upload/initiate] All files uploaded to R2 (temp)');
+    try {
+      await Promise.all(uploadPromises);
+      console.log('[API /upload/initiate] All files uploaded to R2 (temp)');
+    } catch (uploadError) {
+      console.error('[API /upload/initiate] Upload to R2 failed:', uploadError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'ファイルのアップロードに失敗しました',
+          details: uploadError instanceof Error ? uploadError.message : 'Unknown error'
+        },
+        { status: 500 }
+      );
+    }
 
     // Step 2: DBにジョブを作成
     console.log('[API /upload/initiate] Creating upload job with metadata:', {

@@ -10,18 +10,18 @@ datasource db {
 }
 
 model Wedding {
-  wedding_id   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  wedding_date DateTime       @db.Date
-  qr_code_path String?        @db.VarChar(500)
-  created_at   DateTime       @default(now()) @db.Timestamptz(6)
-  updated_at   DateTime       @default(now()) @db.Timestamptz(6)
-  deleted_at   DateTime?      @db.Timestamptz(6)
-  created_by   String?        @db.Uuid
-  updated_by   String?        @db.Uuid
-  deleted_by   String?        @db.Uuid
+  wedding_id   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wedding_date DateTime     @db.Date
+  qr_code_path String?      @db.VarChar(500)
+  created_at   DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime     @default(now()) @db.Timestamptz(6)
+  deleted_at   DateTime?    @db.Timestamptz(6)
+  created_by   String?      @db.Uuid
+  updated_by   String?      @db.Uuid
+  deleted_by   String?      @db.Uuid
   medias       Media[]
   users        User[]
-  invitations  Invitation[]   @relation("InvitationToWedding")
+  invitations  Invitation[] @relation("InvitationToWedding")
 
   @@index([wedding_date], map: "idx_weddings_wedding_date")
   @@index([deleted_at], map: "idx_weddings_deleted_at")
@@ -50,20 +50,20 @@ model User {
 
 /// Media model for storing image and video information
 model Media {
-  media_id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  wedding_id        String    @db.Uuid
-  posted_user_name  String    @db.VarChar(150)
-  media_path        String    @db.VarChar(500)
+  media_id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wedding_id       String    @db.Uuid
+  posted_user_name String    @db.VarChar(150)
+  media_path       String    @db.VarChar(500)
   /// Media type: "image" or "video"
-  media_type        String    @default("image") @db.VarChar(20)
-  posted_at         DateTime  @default(now()) @db.Timestamptz(6)
-  created_at        DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
-  deleted_at        DateTime? @db.Timestamptz(6)
-  created_by        String?   @db.Uuid
-  updated_by        String?   @db.Uuid
-  deleted_by        String?   @db.Uuid
-  wedding           Wedding   @relation(fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
+  media_type       String    @default("image") @db.VarChar(20)
+  posted_at        DateTime  @default(now()) @db.Timestamptz(6)
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  created_by       String?   @db.Uuid
+  updated_by       String?   @db.Uuid
+  deleted_by       String?   @db.Uuid
+  wedding          Wedding   @relation(fields: [wedding_id], references: [wedding_id], onDelete: Restrict)
 
   @@index([wedding_id], map: "idx_medias_wedding_id")
   @@index([posted_user_name], map: "idx_medias_posted_user_name")
@@ -99,19 +99,19 @@ model Invitation {
 
 /// UploadJob model for managing background upload tasks
 model UploadJob {
-  job_id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  wedding_id        String    @db.Uuid
-  user_id           String    @db.Uuid
-  posted_user_name  String    @db.VarChar(150)
-  total_files       Int       @default(0)
-  processed_files   Int       @default(0)
-  failed_files      Int       @default(0)
-  status            String    @default("pending") @db.VarChar(20) // pending, processing, completed, failed
-  error_message     String?   @db.Text
-  file_metadata     Json?     // Store file names and sizes
-  created_at        DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
-  completed_at      DateTime? @db.Timestamptz(6)
+  job_id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wedding_id       String    @db.Uuid
+  user_id          String    @db.Uuid
+  posted_user_name String    @db.VarChar(150)
+  total_files      Int       @default(0)
+  processed_files  Int       @default(0)
+  failed_files     Int       @default(0)
+  status           String    @default("pending") @db.VarChar(20) // pending, processing, completed, failed
+  error_message    String?   @db.Text
+  file_metadata    Json? // Store file names and sizes
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
+  completed_at     DateTime? @db.Timestamptz(6)
 
   @@index([job_id], map: "idx_upload_jobs_job_id")
   @@index([wedding_id], map: "idx_upload_jobs_wedding_id")
@@ -120,4 +120,3 @@ model UploadJob {
   @@index([created_at], map: "idx_upload_jobs_created_at")
   @@map("upload_jobs")
 }
-
