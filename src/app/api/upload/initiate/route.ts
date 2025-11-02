@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { supabaseServer } from '@/lib/supabase-server';
 import { qstashClient, QSTASH_CONFIG } from '@/lib/qstash';
 import { uploadToR2, generateR2Key } from '@/lib/r2';
+import { withAuth } from '@/lib/api/auth-middleware';
 
 // Next.jsのルートセグメント設定
 export const runtime = 'nodejs';
@@ -26,51 +26,12 @@ interface FileMetadata {
   tempR2Key: string; // 一時保存用のキー
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, { user }) => {
   try {
     console.log('[API /upload/initiate] Request received');
+    console.log('[API /upload/initiate] User authenticated:', user.dbUser.user_id);
 
-    // 認証トークンを取得
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      console.error('[API /upload/initiate] No authorization header');
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    console.log('[API /upload/initiate] Token received, length:', token.length);
-
-    // トークンを検証してユーザー情報を取得
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error('[API /upload/initiate] Auth error:', authError);
-      return NextResponse.json(
-        { success: false, error: '認証に失敗しました' },
-        { status: 401 }
-      );
-    }
-
-    console.log('[API /upload/initiate] User authenticated:', user.id);
-
-    // ユーザー情報からwedding_idを取得
-    const dbUser = await prisma.user.findUnique({
-      where: { user_id: user.id },
-      select: { wedding_id: true },
-    });
-
-    if (!dbUser) {
-      console.error('[API /upload/initiate] User not found in database:', user.id);
-      return NextResponse.json(
-        { success: false, error: 'ユーザー情報が見つかりません' },
-        { status: 404 }
-      );
-    }
-
-    const weddingId = dbUser.wedding_id;
+    const weddingId = user.dbUser.wedding_id;
     console.log('[API /upload/initiate] Wedding ID:', weddingId);
 
     // wedding_idが実際に存在するか検証
@@ -217,7 +178,7 @@ export async function POST(request: NextRequest) {
     // Step 2: DBにジョブを作成
     console.log('[API /upload/initiate] Creating upload job with metadata:', {
       weddingId,
-      userId: user.id,
+      userId: user.dbUser.user_id,
       postedUserName,
       totalFiles: files.length,
       metadataLength: fileMetadata.length,
@@ -230,7 +191,7 @@ export async function POST(request: NextRequest) {
       uploadJob = await prisma.uploadJob.create({
         data: {
           wedding_id: weddingId,
-          user_id: user.id,
+          user_id: user.dbUser.user_id,
           posted_user_name: postedUserName,
           total_files: files.length,
           processed_files: 0,
@@ -251,7 +212,7 @@ export async function POST(request: NextRequest) {
       const requestBody = {
         jobId: uploadJob.job_id,
         weddingId,
-        userId: user.id,
+        userId: user.dbUser.user_id,
         postedUserName,
         fileMetadata,
       };
@@ -325,4 +286,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

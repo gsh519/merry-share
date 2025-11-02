@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Mail, Copy, CheckCircle } from 'lucide-react'
+import { useAuthStore } from '@/stores/authStore'
 
 export default function InviteForm() {
   const [email, setEmail] = useState('')
@@ -11,6 +12,11 @@ export default function InviteForm() {
   const [invitationUrl, setInvitationUrl] = useState<string>('')
   const [copied, setCopied] = useState(false)
 
+  // Zustand ストアから認証情報を取得
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const verifyToken = useAuthStore((state) => state.verifyToken)
+  const refreshAccessToken = useAuthStore((state) => state.refreshAccessToken)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -18,17 +24,31 @@ export default function InviteForm() {
     setSuccess(false)
 
     try {
-      // ローカルストレージからトークンを取得
-      const token = localStorage.getItem('access_token')
-      if (!token) {
+      // トークンを確認
+      if (!accessToken) {
         throw new Error('ログインが必要です')
+      }
+
+      // トークンの有効性を確認し、必要に応じてリフレッシュ
+      const isValid = await verifyToken()
+      if (!isValid) {
+        const refreshed = await refreshAccessToken()
+        if (!refreshed) {
+          throw new Error('認証の有効期限が切れました。再度ログインしてください。')
+        }
+      }
+
+      // リフレッシュ後の最新のトークンを取得
+      const currentToken = useAuthStore.getState().accessToken
+      if (!currentToken) {
+        throw new Error('認証トークンの取得に失敗しました。')
       }
 
       const response = await fetch('/api/invitations/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         },
         body: JSON.stringify({ email }),
       })

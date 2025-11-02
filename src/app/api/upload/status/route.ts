@@ -1,29 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { supabaseServer } from '@/lib/supabase-server';
+import { withAuth } from '@/lib/api/auth-middleware';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest, { user }) => {
   try {
-    // 認証トークンを取得
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-
-    // トークンを検証してユーザー情報を取得
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: '認証に失敗しました' },
-        { status: 401 }
-      );
-    }
 
     // クエリパラメータからjobIdを取得
     const { searchParams } = new URL(request.url);
@@ -63,7 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ユーザーが自分のジョブのみアクセスできるようにチェック
-    if (job.user_id !== user.id) {
+    if (job.user_id !== user.dbUser.user_id) {
       return NextResponse.json(
         { success: false, error: 'このジョブにアクセスする権限がありません' },
         { status: 403 }
@@ -100,4 +80,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

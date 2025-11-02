@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuthStore } from '@/stores/authStore'
 
 export default function LoginForm() {
   const router = useRouter()
-  const { login } = useAuth()
+  const login = useAuthStore((state) => state.login)
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
 

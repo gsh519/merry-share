@@ -1,41 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/lib/supabase-server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import { withAuth } from '@/lib/api/auth-middleware'
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, { user }) => {
   try {
-    // 認証チェック
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: '認証が必要です' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token)
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: '認証に失敗しました' },
-        { status: 401 }
-      )
-    }
-
-    // ユーザー情報を取得
-    const currentUser = await prisma.user.findUnique({
-      where: { user_id: user.id },
-      include: { wedding: true }
-    })
-
-    if (!currentUser || !currentUser.wedding_id) {
-      return NextResponse.json(
-        { error: 'ユーザー情報が見つかりません' },
-        { status: 404 }
-      )
-    }
+    const weddingId = user.dbUser.wedding_id;
 
     const body = await request.json()
     const { email } = body
@@ -73,7 +43,7 @@ export async function POST(request: NextRequest) {
     const existingInvitation = await prisma.invitation.findFirst({
       where: {
         email,
-        wedding_id: currentUser.wedding_id,
+        wedding_id: weddingId,
         used_at: null,
         expires_at: {
           gte: new Date()
@@ -98,8 +68,8 @@ export async function POST(request: NextRequest) {
     // 招待レコードを作成
     const invitation = await prisma.invitation.create({
       data: {
-        wedding_id: currentUser.wedding_id,
-        invited_by: user.id,
+        wedding_id: weddingId,
+        invited_by: user.dbUser.user_id,
         email,
         token: invitationToken,
         expires_at: expiresAt
@@ -140,4 +110,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+});

@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { uploadToR2, generateR2Key } from '@/lib/r2';
 import { prisma } from '@/lib/prisma';
 import { optimizeMedia } from '@/lib/imageOptimizer';
-import { supabaseServer } from '@/lib/supabase-server';
+import { withAuth } from '@/lib/api/auth-middleware';
 
 // Next.jsのルートセグメント設定
 export const runtime = 'nodejs';
@@ -18,54 +18,11 @@ const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
 // 最大ファイルサイズ (100MB)
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, { user }) => {
   try {
     console.log('[API /media/upload] Request received');
 
-    // 認証トークンを取得（他のAPIと同じパターン）
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      console.error('[API /media/upload] No authorization header');
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    console.log('[API /media/upload] Token received, length:', token.length);
-
-    // トークンを検証してユーザー情報を取得
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error('[API /media/upload] Auth error:', authError);
-      return NextResponse.json(
-        { success: false, error: '認証に失敗しました' },
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('[API /media/upload] User authenticated:', user.id);
-
-    // ユーザー情報からwedding_idを取得
-    const dbUser = await prisma.user.findUnique({
-      where: { user_id: user.id },
-      select: { wedding_id: true },
-    });
-
-    console.log('[API /media/upload] dbUser', dbUser);
-
-    if (!dbUser) {
-      console.error('[API /media/upload] User not found in database:', user.id);
-      return NextResponse.json(
-        { success: false, error: 'ユーザー情報が見つかりません' },
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const weddingId = dbUser.wedding_id;
-
+    const weddingId = user.dbUser.wedding_id;
     console.log('[API /media/upload] Wedding ID:', weddingId);
 
     // wedding_idが実際に存在するか検証
@@ -221,4 +178,4 @@ export async function POST(request: NextRequest) {
       }
     );
   }
-}
+});

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuthStore } from '@/stores/authStore';
 
 export interface UploadJobStatus {
   jobId: string;
@@ -31,7 +32,9 @@ export function useUploadStatus(jobId: string | null, pollingInterval = 2000): U
     if (!jobId) return;
 
     try {
-      const accessToken = localStorage.getItem('access_token');
+      // Zustand ストアから最新のトークンを取得
+      const accessToken = useAuthStore.getState().accessToken;
+
       if (!accessToken) {
         throw new Error('認証情報が見つかりません');
       }

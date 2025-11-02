@@ -3,9 +3,10 @@
 import { Heart, LogOut, UserPlus } from "lucide-react"
 import { FloatingUploadButton } from "@/components/FloatingUploadButton"
 import { QRCodeGenerator } from "@/components/QRCodeGenerator"
-import { useAuth } from "@/contexts/AuthContext"
+import { useAuthStore } from "@/stores/authStore"
 import { ReactNode } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 interface HomeClientProps {
   children: ReactNode
@@ -13,7 +14,14 @@ interface HomeClientProps {
 }
 
 export default function HomeClient({ children, showUploadButton = true }: HomeClientProps) {
-  const { user, logout } = useAuth()
+  const user = useAuthStore((state) => state.user)
+  const logout = useAuthStore((state) => state.logout)
+  const router = useRouter()
+
+  const handleLogout = () => {
+    logout()
+    router.push('/login')
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-amber-50">
@@ -46,7 +54,7 @@ export default function HomeClient({ children, showUploadButton = true }: HomeCl
                 <UserPlus className="w-5 h-5 text-gray-600" />
               </Link>
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="p-2 rounded-lg hover:bg-rose-50 transition-colors"
                 title="ログアウト"
               >

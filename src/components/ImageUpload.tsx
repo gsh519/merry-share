@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Upload, X, Camera, Loader2 } from "lucide-react";
 import { UploadStatusToast } from "./UploadStatusToast";
+import { useAuthStore } from "@/stores/authStore";
 
 interface ImageUploadProps {
   isOpen: boolean;
@@ -21,6 +22,11 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
   const [backgroundJobId, setBackgroundJobId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Zustand ストアから認証情報を取得
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const verifyToken = useAuthStore((state) => state.verifyToken);
+  const refreshAccessToken = useAuthStore((state) => state.refreshAccessToken);
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     setSelectedFiles(files);
@@ -38,9 +44,24 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
 
     try {
       // 認証トークンを取得
-      const accessToken = localStorage.getItem('access_token');
       if (!accessToken) {
         throw new Error('認証情報が見つかりません。再度ログインしてください。');
+      }
+
+      // トークンの有効性を確認し、必要に応じてリフレッシュ
+      const isValid = await verifyToken();
+      if (!isValid) {
+        // トークンが無効な場合、リフレッシュを試みる
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+          throw new Error('認証の有効期限が切れました。再度ログインしてください。');
+        }
+      }
+
+      // リフレッシュ後の最新のトークンを取得
+      const currentToken = useAuthStore.getState().accessToken;
+      if (!currentToken) {
+        throw new Error('認証トークンの取得に失敗しました。');
       }
 
       // ファイル数が閾値以上の場合、プレサインドURL方式でバックグラウンド処理
@@ -57,7 +78,7 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
         const presignedResponse = await fetch("/api/upload/presigned-url", {
           method: "POST",
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': `Bearer ${currentToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ files: fileRequests }),
@@ -111,7 +132,7 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
         const completeResponse = await fetch("/api/upload/complete", {
           method: "POST",
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': `Bearer ${currentToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -154,7 +175,7 @@ export function ImageUpload({ isOpen, onClose }: ImageUploadProps) {
         const response = await fetch("/api/media/upload", {
           method: "POST",
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': `Bearer ${currentToken}`,
           },
           body: formData,
         });
