@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,7 @@ const completeSignUpSchema = z.object({
 
 type CompleteSignUpFormData = z.infer<typeof completeSignUpSchema>;
 
-export default function SignUpCompletePage() {
+function SignUpCompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -168,5 +168,13 @@ export default function SignUpCompletePage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function SignUpCompletePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">読み込み中...</div>}>
+      <SignUpCompleteContent />
+    </Suspense>
   );
 }
