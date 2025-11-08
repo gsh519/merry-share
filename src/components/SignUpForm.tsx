@@ -23,6 +23,9 @@ export default function SignUpForm() {
   // 招待トークンがある場合とない場合でフォームを切り替え
   const isInvitation = !!invitationToken
 
+  // ローカル認証が有効かどうかを判定
+  const enableLocalAuth = process.env.NEXT_PUBLIC_ENABLE_LOCAL_AUTH === 'true'
+
   // URLから招待トークンを取得して検証
   useEffect(() => {
     const token = searchParams.get('token')
@@ -116,92 +119,96 @@ export default function SignUpForm() {
         </div>
       )}
 
-      {/* メール/パスワード会員登録フォーム */}
-      <form onSubmit={handleEmailSignUp} className="space-y-4 mb-6">
-        <div>
-          <label htmlFor="userName" className="block text-sm font-semibold text-gray-700 mb-2">
-            ユーザー名
-          </label>
-          <input
-            id="userName"
-            type="text"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            required
-            disabled={loading}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            placeholder="山田太郎"
-          />
-        </div>
+      {/* メール/パスワード会員登録フォーム（開発環境のみ表示） */}
+      {enableLocalAuth && (
+        <>
+          <form onSubmit={handleEmailSignUp} className="space-y-4 mb-6">
+            <div>
+              <label htmlFor="userName" className="block text-sm font-semibold text-gray-700 mb-2">
+                ユーザー名
+              </label>
+              <input
+                id="userName"
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                required
+                disabled={loading}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                placeholder="山田太郎"
+              />
+            </div>
 
-        <div>
-          <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-            メールアドレス
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={loading}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            placeholder="example@email.com"
-          />
-        </div>
+            <div>
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                メールアドレス
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                placeholder="example@email.com"
+              />
+            </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-            パスワード
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            disabled={loading}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            placeholder="6文字以上"
-          />
-        </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+                パスワード
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                disabled={loading}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                placeholder="6文字以上"
+              />
+            </div>
 
-        {!isInvitation && (
-          <div>
-            <label htmlFor="weddingDate" className="block text-sm font-semibold text-gray-700 mb-2">
-              結婚式の日付
-            </label>
-            <input
-              id="weddingDate"
-              type="date"
-              value={weddingDate}
-              onChange={(e) => setWeddingDate(e.target.value)}
-              required
+            {!isInvitation && (
+              <div>
+                <label htmlFor="weddingDate" className="block text-sm font-semibold text-gray-700 mb-2">
+                  結婚式の日付
+                </label>
+                <input
+                  id="weddingDate"
+                  type="date"
+                  value={weddingDate}
+                  onChange={(e) => setWeddingDate(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            />
+              className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white py-3.5 px-4 rounded-xl font-semibold hover:from-rose-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+            >
+              {loading ? '登録中...' : '会員登録'}
+            </button>
+          </form>
+
+          {/* 区切り線 */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white/80 text-gray-500 font-medium">または</span>
+            </div>
           </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white py-3.5 px-4 rounded-xl font-semibold hover:from-rose-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
-        >
-          {loading ? '登録中...' : '会員登録'}
-        </button>
-      </form>
-
-      {/* 区切り線 */}
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-white/80 text-gray-500 font-medium">または</span>
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Google OAuth */}
       <div className="space-y-4">

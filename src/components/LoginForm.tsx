@@ -13,6 +13,9 @@ export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
+  // ローカル認証が有効かどうかを判定
+  const enableLocalAuth = process.env.NEXT_PUBLIC_ENABLE_LOCAL_AUTH === 'true'
+
   const handleGoogleSignIn = async () => {
     setError('')
     setLoading(true)
@@ -52,59 +55,63 @@ export default function LoginForm() {
         </div>
       )}
 
-      {/* メール/パスワードログインフォーム */}
-      <form onSubmit={handleEmailSignIn} className="space-y-4 mb-6">
-        <div>
-          <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-            メールアドレス
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={loading}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            placeholder="example@email.com"
-          />
-        </div>
+      {/* メール/パスワードログインフォーム（開発環境のみ表示） */}
+      {enableLocalAuth && (
+        <>
+          <form onSubmit={handleEmailSignIn} className="space-y-4 mb-6">
+            <div>
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                メールアドレス
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                placeholder="example@email.com"
+              />
+            </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-            パスワード
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            disabled={loading}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            placeholder="6文字以上"
-          />
-        </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+                パスワード
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                disabled={loading}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                placeholder="6文字以上"
+              />
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white py-3.5 px-4 rounded-xl font-semibold hover:from-rose-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
-        >
-          {loading ? 'ログイン中...' : 'ログイン'}
-        </button>
-      </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white py-3.5 px-4 rounded-xl font-semibold hover:from-rose-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+            >
+              {loading ? 'ログイン中...' : 'ログイン'}
+            </button>
+          </form>
 
-      {/* 区切り線 */}
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-white/80 text-gray-500 font-medium">または</span>
-        </div>
-      </div>
+          {/* 区切り線 */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white/80 text-gray-500 font-medium">または</span>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Google OAuth */}
       <div className="space-y-4">
