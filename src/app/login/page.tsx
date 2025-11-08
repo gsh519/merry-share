@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import LoginForm from '@/components/LoginForm'
 
 export default function LoginPage() {
@@ -13,7 +14,9 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <LoginForm />
+        <Suspense fallback={<div className="text-center">読み込み中...</div>}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   )

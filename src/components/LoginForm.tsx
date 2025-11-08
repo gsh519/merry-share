@@ -1,13 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/lib/supabase'
 
 export default function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const signInWithGoogle = useAuthStore((state) => state.signInWithGoogle)
   const signInWithEmail = useAuthStore((state) => state.signInWithEmail)
+  const login = useAuthStore((state) => state.login)
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
@@ -15,6 +18,82 @@ export default function LoginForm() {
 
   // ローカル認証が有効かどうかを判定
   const enableLocalAuth = process.env.NEXT_PUBLIC_ENABLE_LOCAL_AUTH === 'true'
+
+  // URLフラグメントからトークンを取得してセッションを確立
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      // URLエラーパラメータをチェック
+      const urlError = searchParams.get('error')
+      if (urlError) {
+        setError(decodeURIComponent(urlError))
+        return
+      }
+
+      // URLフラグメントからトークンを取得
+      const hash = window.location.hash
+      if (hash && hash.includes('access_token')) {
+        setLoading(true)
+        try {
+          // Supabaseにセッションを設定
+          const { data, error: sessionError } = await supabase.auth.setSession({
+            access_token: new URLSearchParams(hash.substring(1)).get('access_token') || '',
+            refresh_token: new URLSearchParams(hash.substring(1)).get('refresh_token') || '',
+          })
+
+          if (sessionError) {
+            console.error('Session error:', sessionError)
+            setError('認証に失敗しました')
+            setLoading(false)
+            return
+          }
+
+          if (!data.user?.email) {
+            setError('ユーザー情報の取得に失敗しました')
+            setLoading(false)
+            return
+          }
+
+          // DBでユーザーを確認
+          const response = await fetch('/api/auth/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: data.session?.access_token }),
+          })
+
+          const userData = await response.json()
+
+          if (response.ok && userData.isValid) {
+            // 既存ユーザー: Zustandに保存してホームへ
+            login(
+              userData.user,
+              userData.wedding,
+              data.session?.access_token || '',
+              data.session?.refresh_token || ''
+            )
+            // URLフラグメントをクリア
+            window.history.replaceState({}, document.title, '/login')
+            router.push('/')
+          } else {
+            // 新規ユーザー: 会員登録完了ページへ
+            const redirectUrl = new URL('/signup/complete', window.location.origin)
+            redirectUrl.searchParams.set('access_token', data.session?.access_token || '')
+            redirectUrl.searchParams.set('refresh_token', data.session?.refresh_token || '')
+            redirectUrl.searchParams.set('email', data.user.email)
+            redirectUrl.searchParams.set('name', data.user.user_metadata?.full_name || data.user.email.split('@')[0])
+
+            window.history.replaceState({}, document.title, '/login')
+            router.push(redirectUrl.toString())
+          }
+        } catch (err) {
+          console.error('OAuth callback error:', err)
+          setError('認証処理中にエラーが発生しました')
+          setLoading(false)
+        }
+      }
+    }
+
+    handleOAuthCallback()
+  }, [searchParams, login, router])
 
   const handleGoogleSignIn = async () => {
     setError('')
