@@ -4,9 +4,9 @@ import { Heart, LogOut, UserPlus } from "lucide-react"
 import { FloatingUploadButton } from "@/components/FloatingUploadButton"
 import { QRCodeGenerator } from "@/components/QRCodeGenerator"
 import { useAuthStore } from "@/stores/authStore"
-import { ReactNode } from "react"
+import { ReactNode, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface HomeClientProps {
   children: ReactNode
@@ -15,8 +15,30 @@ interface HomeClientProps {
 
 export default function HomeClient({ children, showUploadButton = true }: HomeClientProps) {
   const user = useAuthStore((state) => state.user)
+  const login = useAuthStore((state) => state.login)
   const logout = useAuthStore((state) => state.logout)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // OAuth認証後のセッション情報を復元
+  useEffect(() => {
+    const accessToken = searchParams.get('access_token')
+    const refreshToken = searchParams.get('refresh_token')
+
+    if (accessToken && refreshToken) {
+      // LocalStorageから一時保存されたユーザー情報を取得
+      const authStorage = localStorage.getItem('auth-storage')
+      if (authStorage) {
+        const { state } = JSON.parse(authStorage)
+        if (state.user && state.wedding) {
+          login(state.user, state.wedding, accessToken, refreshToken)
+        }
+      }
+
+      // URLパラメータをクリア（リロード時に再度処理されないように）
+      router.replace('/')
+    }
+  }, [searchParams, login, router])
 
   const handleLogout = () => {
     logout()

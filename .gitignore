@@ -38,3 +38,6 @@ next-env.d.ts
 
 # Docker
 .dockerignore
+
+# Supabase (ローカル設定ファイルに機密情報が含まれるため)
+/supabase/config.toml

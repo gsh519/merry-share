@@ -33,6 +33,15 @@ interface AuthActions {
   refreshAccessToken: () => Promise<boolean>
   setLoading: (isLoading: boolean) => void
   initialize: () => Promise<void>
+  signInWithGoogle: (invitationToken?: string) => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<void>
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    userName: string,
+    weddingDate?: string,
+    invitationToken?: string
+  ) => Promise<void>
 }
 
 export type AuthStore = AuthState & AuthActions
@@ -169,6 +178,109 @@ export const useAuthStore = create<AuthStore>()(
         }
 
         await get().verifyToken()
+      },
+
+      // Google OAuth認証
+      signInWithGoogle: async (invitationToken?: string) => {
+        set({ isLoading: true })
+
+        try {
+          const { supabase } = await import('@/lib/supabase')
+
+          // リダイレクトURL（コールバック）を構築
+          const redirectTo = `${window.location.origin}/api/auth/callback${
+            invitationToken ? `?invitation_token=${invitationToken}` : ''
+          }`
+
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo,
+              queryParams: {
+                access_type: 'offline',
+                prompt: 'consent',
+              },
+            },
+          })
+
+          if (error) {
+            console.error('Google sign in error:', error)
+            throw error
+          }
+
+          // リダイレクトが発生するため、ここには到達しない
+        } catch (error) {
+          console.error('Google OAuth error:', error)
+          set({ isLoading: false })
+          throw error
+        }
+      },
+
+      // メール/パスワードでログイン
+      signInWithEmail: async (email: string, password: string) => {
+        set({ isLoading: true })
+
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          })
+
+          const data = await response.json()
+
+          if (!response.ok) {
+            throw new Error(data.error || 'ログインに失敗しました')
+          }
+
+          // ログイン成功
+          get().login(
+            data.user,
+            data.wedding,
+            data.session.access_token,
+            data.session.refresh_token
+          )
+        } catch (error) {
+          set({ isLoading: false })
+          throw error
+        }
+      },
+
+      // メール/パスワードで会員登録
+      signUpWithEmail: async (
+        email: string,
+        password: string,
+        userName: string,
+        weddingDate?: string,
+        invitationToken?: string
+      ) => {
+        set({ isLoading: true })
+
+        try {
+          const response = await fetch('/api/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              password,
+              userName,
+              weddingDate,
+              invitationToken,
+            }),
+          })
+
+          const data = await response.json()
+
+          if (!response.ok) {
+            throw new Error(data.error || '会員登録に失敗しました')
+          }
+
+          // 会員登録成功後、自動的にログイン
+          await get().signInWithEmail(email, password)
+        } catch (error) {
+          set({ isLoading: false })
+          throw error
+        }
       },
     }),
     {
