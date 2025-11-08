@@ -100,3 +100,6 @@ export const prisma = typeof window === 'undefined'
 if (typeof window === 'undefined') {
   globalForPrisma.prisma = prisma
 }
+
+// default exportを追加
+export default prisma

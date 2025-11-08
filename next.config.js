@@ -18,12 +18,8 @@ const nextConfig = {
       },
     ],
   },
-  // API Routeのボディサイズ制限を設定（スマホからの大容量アップロードに対応）
-  api: {
-    bodyParser: {
-      sizeLimit: '150mb',
-    },
-  },
+  // Note: App Routerでは、ボディサイズ制限は各ルートハンドラーで個別に設定します
+  // Pages Routerの'api'設定はApp Routerでは使用されません
 }
 
 module.exports = nextConfig

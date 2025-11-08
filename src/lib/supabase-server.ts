@@ -21,3 +21,23 @@ export const supabaseServer = createClient(supabaseUrl, supabaseKey, {
     persistSession: false,
   },
 })
+
+// サーバーサイド用のcreateServerClient関数をエクスポート
+export function createServerClient() {
+  if (!supabaseUrl) {
+    throw new Error('Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL environment variable')
+  }
+
+  const key = supabaseServiceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!key) {
+    throw new Error('Missing Supabase key environment variable')
+  }
+
+  return createClient(supabaseUrl, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
