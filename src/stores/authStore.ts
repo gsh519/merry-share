@@ -33,7 +33,6 @@ interface AuthActions {
   refreshAccessToken: () => Promise<boolean>
   setLoading: (isLoading: boolean) => void
   initialize: () => Promise<void>
-  signInWithGoogle: (invitationToken?: string) => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUpWithEmail: (
     email: string,
@@ -178,42 +177,6 @@ export const useAuthStore = create<AuthStore>()(
         }
 
         await get().verifyToken()
-      },
-
-      // Google OAuth認証
-      signInWithGoogle: async (invitationToken?: string) => {
-        set({ isLoading: true })
-
-        try {
-          const { supabase } = await import('@/lib/supabase')
-
-          // リダイレクトURL（コールバック）を構築
-          const redirectTo = `${window.location.origin}/api/auth/callback${
-            invitationToken ? `?invitation_token=${invitationToken}` : ''
-          }`
-
-          const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-              redirectTo,
-              queryParams: {
-                access_type: 'offline',
-                prompt: 'consent',
-              },
-            },
-          })
-
-          if (error) {
-            console.error('Google sign in error:', error)
-            throw error
-          }
-
-          // リダイレクトが発生するため、ここには到達しない
-        } catch (error) {
-          console.error('Google OAuth error:', error)
-          set({ isLoading: false })
-          throw error
-        }
       },
 
       // メール/パスワードでログイン

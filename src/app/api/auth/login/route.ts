@@ -2,20 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { prisma } from '@/lib/prisma'
 
-// ローカル開発環境かどうかを判定（環境変数が設定されていない場合は本番扱い）
-const isLocalAuthEnabled = () => {
-  return process.env.ENABLE_LOCAL_AUTH === 'true'
-}
-
 export async function POST(request: NextRequest) {
-  // ローカル開発環境でない場合は403を返す
-  if (!isLocalAuthEnabled()) {
-    return NextResponse.json(
-      { error: 'この機能はローカル開発環境でのみ利用可能です' },
-      { status: 403 }
-    )
-  }
-
   try {
     const body = await request.json()
     const { email, password } = body
